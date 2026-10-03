@@ -448,12 +448,12 @@
         <button class="mode-card" onclick="chooseMode('self')">
           <span class="mc-icon">◉</span>
           <div class="mc-title">Я о себе</div>
-          <div class="mc-desc">Пройдите опросник о себе. В конце можно сохранить результат в профиль — чтобы потом сравнить с оценками других.</div>
+          <div class="mc-desc">Пройдите опросник о себе. Псевдоним обязателен: по нему сохраняется ваша самооценка, и к ней потом добавляются оценки других.</div>
         </button>
         <button class="mode-card purple" onclick="chooseMode('other')">
           <span class="mc-icon">◌</span>
           <div class="mc-title">Я о другом</div>
-          <div class="mc-desc">Оцените знакомого глазами со стороны. Ответы сохранятся в его профиль.</div>
+          <div class="mc-desc">Оцените знакомого. Псевдоним того, про кого анкета, обязателен — так все ответы о нём собираются в один профиль.</div>
         </button>
       </div>
       <div class="intro-links">
@@ -485,15 +485,17 @@
   <section id="subjectSetup">
     <div class="setup-card">
       <div class="setup-step">Шаг 1 из 2</div>
-      <h2>Кого вы оцениваете?</h2>
-      <p class="setup-desc">Введите имя человека. Если профиль уже создан — начните печатать, и имя появится в подсказках.</p>
-      <label class="field-label" for="subjectNameInput">Имя человека</label>
+      <h2 id="setupTitle">Кого вы оцениваете?</h2>
+      <p class="setup-desc" id="setupDesc">Псевдоним обязателен.</p>
+      <label class="field-label" id="subjectLabel" for="subjectNameInput">Псевдоним человека</label>
       <input id="subjectNameInput" class="field-input" list="subjectList" placeholder="Например: Иван" maxlength="40" autocomplete="off">
       <datalist id="subjectList"></datalist>
-      <div class="field-hint">Если такого профиля ещё нет — он будет создан.</div>
-      <label class="field-label" for="raterNameInput">Ваше имя <span class="opt">(необязательно)</span></label>
-      <input id="raterNameInput" class="field-input" placeholder="Например: Анна" maxlength="40" autocomplete="off">
-      <div class="field-hint">Поможет при просмотре профиля понять, кто дал оценку.</div>
+      <div class="field-hint" id="subjectHint">Если такого профиля ещё нет — он будет создан.</div>
+      <div id="raterBlock">
+        <label class="field-label" for="raterNameInput">Ваш псевдоним</label>
+        <input id="raterNameInput" class="field-input" placeholder="Например: Анна" maxlength="40" autocomplete="off">
+        <div class="field-hint">Так сохранится, кто заполнил эту анкету.</div>
+      </div>
       <div class="setup-actions">
         <button class="btn ghost" onclick="navTo('intro')">← Назад</button>
         <button class="btn" onclick="confirmSubject()">Начать опрос →</button>
@@ -723,7 +725,7 @@
         <h2>Сохранённые профили</h2>
         <button class="btn danger small" onclick="clearAllProfiles()">Очистить все</button>
       </div>
-      <p class="profiles-desc">Результаты хранятся в базе данных на сервере и доступны с любого устройства. Чтобы собрать мнение нескольких людей об одном человеке — отправьте им ссылку на этот опросник, пусть пройдут «Я о другом» и введут то же имя.</p>
+      <p class="profiles-desc">У каждого псевдонима свой id. Ответы «о себе» и «о другом» с одним и тем же псевдонимом собираются в один профиль. Чтобы добавить чужую оценку, отправьте ссылку и попросите ввести тот же псевдоним.</p>
       <div class="profile-list" id="profilesList"></div>
       <div class="res-actions" style="justify-content:flex-start;margin-top:22px">
         <button class="btn ghost" onclick="navTo('intro')">← На главную</button>
@@ -1034,24 +1036,43 @@ function navTo(target){
 
 function chooseMode(m){
   mode = m;
-  if(m === 'self'){ subjectName = ''; raterName = ''; startQuiz(); }
-  else {
-    const dl = document.getElementById('subjectList');
-    dl.innerHTML = '';
-    DB.listSubjects().then(list => {
-      list.forEach(s => { const opt = document.createElement('option'); opt.value = s.name; dl.appendChild(opt); });
-    }).catch(()=>{});
-    document.getElementById('subjectNameInput').value = '';
-    document.getElementById('raterNameInput').value = '';
-    show('subjectSetup');
-    setTimeout(()=> document.getElementById('subjectNameInput').focus(), 300);
-  }
+  subjectName = '';
+  raterName = '';
+  const isSelf = m === 'self';
+  document.getElementById('setupTitle').textContent = isSelf ? 'Как вас записать?' : 'Кого вы оцениваете?';
+  document.getElementById('setupDesc').textContent = isSelf
+    ? 'Введите свой псевдоним. Он обязателен: самооценка сохранится под вашим id, и потом к ней можно будет добавить оценки других людей.'
+    : 'Псевдоним того, про кого анкета, обязателен. Все ответы с тем же псевдонимом соберутся в один профиль.';
+  document.getElementById('subjectLabel').textContent = isSelf ? 'Ваш псевдоним' : 'Псевдоним человека';
+  document.getElementById('subjectHint').textContent = isSelf
+    ? 'Если вы уже проходили опрос, введите тот же псевдоним — запись попадёт в тот же профиль.'
+    : 'Если профиль уже есть, начните печатать — псевдоним появится в подсказках. Новый псевдоним создаст новый id.';
+  document.getElementById('raterBlock').style.display = isSelf ? 'none' : '';
+  const dl = document.getElementById('subjectList');
+  dl.innerHTML = '';
+  DB.listSubjects().then(list => {
+    list.forEach(s => { const opt = document.createElement('option'); opt.value = s.name; dl.appendChild(opt); });
+  }).catch(()=>{});
+  document.getElementById('subjectNameInput').value = '';
+  document.getElementById('raterNameInput').value = '';
+  show('subjectSetup');
+  setTimeout(()=> document.getElementById('subjectNameInput').focus(), 300);
 }
 function confirmSubject(){
   const s = document.getElementById('subjectNameInput').value.trim();
   const r = document.getElementById('raterNameInput').value.trim();
-  if(!s){ showToast('Введите имя человека'); document.getElementById('subjectNameInput').focus(); return; }
-  subjectName = s; raterName = r;
+  if(!s){
+    showToast(mode === 'self' ? 'Введите свой псевдоним' : 'Введите псевдоним человека');
+    document.getElementById('subjectNameInput').focus();
+    return;
+  }
+  if(mode === 'other' && !r){
+    showToast('Введите свой псевдоним');
+    document.getElementById('raterNameInput').focus();
+    return;
+  }
+  subjectName = s;
+  raterName = mode === 'self' ? s : r;
   startQuiz();
 }
 
@@ -1083,7 +1104,7 @@ function renderQuestion(){
     text = v.qOther[q.idx] + (subj ? ' <span style="font-size:14px;color:#7a7290;">— ' + subj + '</span>' : '');
   }
   qText.innerHTML = text;
-  quizModeBadge.textContent = mode === 'self' ? 'Я о себе' : 'Я о другом · ' + subjectName;
+  quizModeBadge.textContent = mode === 'self' ? 'Я о себе · ' + subjectName : 'Я о другом · ' + subjectName;
   quizModeBadge.className = 'quiz-mode-badge' + (mode === 'self' ? ' self' : '');
 
   qOptions.innerHTML = '';
@@ -1181,19 +1202,37 @@ function showResults(){
   renderSavePanel();
   show('results');
   setTimeout(animateBars, 80);
-  if(mode === 'other' && subjectName && lastSave.state === 'idle') submitOtherResult();
+  if(subjectName && lastSave.state === 'idle') submitResult();
 }
 
-/* Сохранение оценки «Я о другом» в базу данных */
-async function submitOtherResult(){
-  lastSave = { state:'saving', profile:null, error:null, name:subjectName };
+/* Сохранение ответа: id заполнившего и id того, про кого анкета */
+async function submitResult(){
+  lastSave = { state:'saving', profile:null, error:null, name:subjectName, authorId:null, subjectId:null };
   renderSavePanel();
   try {
-    const res = await saveOtherResponse(subjectName, raterName, answers);
-    lastSave = { state:'saved', profile:res.subject, error:null, name:res.subject.name };
-    showToast('Оценка сохранена в профиль «' + res.subject.name + '»');
+    let res;
+    if(mode === 'self'){
+      try {
+        res = await saveSelfResponse(subjectName, answers, false);
+      } catch(e){
+        if(e.status !== 409) throw e;
+        if(!confirm('Профиль с псевдонимом «' + subjectName + '» уже есть. Перезаписать самооценку?')){
+          lastSave = { state:'error', profile:null, error:'Самооценка не перезаписана', name:subjectName, authorId:null, subjectId:null };
+          renderSavePanel();
+          return;
+        }
+        res = await saveSelfResponse(subjectName, answers, true);
+      }
+    } else {
+      res = await saveOtherResponse(subjectName, raterName, answers);
+    }
+    lastSave = {
+      state:'saved', profile:res.subject, error:null,
+      name:res.subject.name, authorId:res.author_id, subjectId:res.subject_id
+    };
+    showToast('Сохранено · id ' + res.subject_id + ' «' + res.subject.name + '»');
   } catch(e){
-    lastSave = { state:'error', profile:null, error:e.message, name:subjectName };
+    lastSave = { state:'error', profile:null, error:e.message, name:subjectName, authorId:null, subjectId:null };
   }
   renderSavePanel();
   updateProfileCount();
@@ -1359,10 +1398,7 @@ function renderSavePanel(){
       '<div class="sp-label" style="color:#a8433a;">Не удалось сохранить результат</div>' +
       '<div class="sp-hint" style="color:#8a2d24;">' + escapeHtml(lastSave.error || 'Ошибка') + '</div>' +
       '<div class="sp-fields" style="margin-top:10px;">' +
-        (mode === 'self'
-          ? '<input id="saveNameInput" class="field-input" placeholder="Ваше имя (например: Иван)" maxlength="40" value="' + escapeHtml(lastSave.name || '') + '">' +
-            '<button class="btn" onclick="saveCurrentAsSelf()">Повторить</button>'
-          : '<button class="btn" onclick="submitOtherResult()">Повторить</button>') +
+        '<button class="btn" onclick="submitResult()">Повторить</button>' +
       '</div>';
     return;
   }
@@ -1371,60 +1407,28 @@ function renderSavePanel(){
     const countOthers = subj ? subj.others.length : 0;
     const hasSelf = !!(subj && subj.self);
     panel.className = 'save-panel saved';
+    const who = lastSave.authorId ? 'Кто заполнил: id <b>' + lastSave.authorId + '</b>' + (mode === 'self' ? '' : ' «' + escapeHtml(raterName) + '»') + '. ' : '';
+    const about = 'Про кого: id <b>' + (lastSave.subjectId || (subj && subj.id) || '—') + '</b> «' + escapeHtml(lastSave.name) + '». ';
     if(mode === 'self'){
       panel.innerHTML =
-        '<div class="sp-label">Самооценка сохранена в профиль: <b>' + escapeHtml(lastSave.name) + '</b></div>' +
-        '<div class="sp-hint">' +
-          (countOthers ? 'Оценок от окружающих: <b>' + countOthers + '</b> — можно сравнить.' : 'Оценок от окружающих пока нет. Попросите знакомых пройти опрос «Я о другом» и ввести имя <b>' + escapeHtml(lastSave.name) + '</b>.') +
+        '<div class="sp-label">Самооценка сохранена</div>' +
+        '<div class="sp-hint">' + who + about +
+          (countOthers ? 'Оценок от окружающих: <b>' + countOthers + '</b>.' : 'Оценок от окружающих пока нет. Пусть знакомые пройдут «Я о другом» и введут псевдоним <b>' + escapeHtml(lastSave.name) + '</b>.') +
           profileLink(lastSave.name) +
         '</div>';
     } else {
       panel.innerHTML =
-        '<div class="sp-label">Сохранено в профиль: <b>' + escapeHtml(lastSave.name) + '</b></div>' +
-        '<div class="sp-hint">Всего оценок от окружающих: <b>' + countOthers + '</b>. ' +
-        (hasSelf ? 'Самооценка автора тоже есть — можно сравнить.' : 'Самооценки автора пока нет.') +
-        profileLink(lastSave.name) + '</div>';
+        '<div class="sp-label">Оценка сохранена</div>' +
+        '<div class="sp-hint">' + who + about +
+          'Всего оценок от окружающих: <b>' + countOthers + '</b>. ' +
+          (hasSelf ? 'Самооценка тоже есть — можно сравнить.' : 'Самооценки пока нет.') +
+          profileLink(lastSave.name) + '</div>';
     }
     return;
   }
 
-  // idle
-  if(mode === 'self'){
-    panel.className = 'save-panel';
-    panel.innerHTML =
-      '<div class="sp-label">Сохранить в профиль</div>' +
-      '<div class="sp-fields">' +
-        '<input id="saveNameInput" class="field-input" placeholder="Ваше имя (например: Иван)" maxlength="40">' +
-        '<button class="btn" onclick="saveCurrentAsSelf()">Сохранить</button>' +
-      '</div>' +
-      '<div class="sp-hint">Результат сохранится в базу данных. Имя нужно, чтобы потом сравнить вашу самооценку с оценками других людей.</div>';
-  } else {
-    panel.className = 'save-panel';
-    panel.innerHTML = '<div class="sp-label">Сохранение в базу данных…</div>';
-  }
-}
-async function saveCurrentAsSelf(){
-  const input = document.getElementById('saveNameInput');
-  const name = (input && input.value || '').trim();
-  if(!name){ showToast('Введите имя'); if(input) input.focus(); return; }
-  const btn = document.querySelector('#savePanel .btn');
-  if(btn) btn.disabled = true;
-  try {
-    let res;
-    try {
-      res = await saveSelfResponse(name, answers, false);
-    } catch(e){
-      if(e.status !== 409) throw e;
-      if(!confirm('Профиль с таким именем уже есть. Перезаписать самооценку?')){ if(btn) btn.disabled = false; return; }
-      res = await saveSelfResponse(name, answers, true);
-    }
-    lastSave = { state:'saved', profile:res.subject, error:null, name:res.subject.name };
-    showToast('Сохранено в профиль «' + res.subject.name + '»');
-  } catch(e){
-    lastSave = { state:'error', profile:null, error:e.message, name:name };
-  }
-  updateProfileCount();
-  renderSavePanel();
+  panel.className = 'save-panel';
+  panel.innerHTML = '<div class="sp-label">Сохранение в базу данных…</div>';
 }
 
 function balanceText(Ya, My, quad, isOther){
@@ -1690,6 +1694,7 @@ async function showProfiles(){
       const item = document.createElement('div');
       item.className = 'profile-item';
       const parts = [];
+      if(subj.id != null) parts.push('<span class="badge">id ' + subj.id + '</span>');
       if(hasSelf) parts.push('<span class="badge self">самооценка</span>');
       if(othersCount) parts.push('<span class="badge other">оценок: ' + othersCount + '</span>');
       const meta = parts.join(' ') || '<span class="badge">пусто</span>';
@@ -1716,6 +1721,7 @@ async function viewSubject(name){
 
 function renderSubjectView(subj){
   document.getElementById('svName').textContent = subj.name;
+  const personId = subj.id != null ? 'id ' + subj.id : '';
   const selfScores = subj.self ? scoresFromAnswers(subj.self.answers) : null;
   const othersScoresArr = subj.others.map(o => scoresFromAnswers(o.answers));
   const othersCount = othersScoresArr.length;
@@ -1730,6 +1736,7 @@ function renderSubjectView(subj){
   if(hasSelf) metaParts.push('самооценка автора');
   if(hasOthers) metaParts.push('оценок от окружающих: ' + othersCount);
   if(!hasSelf && !hasOthers) metaParts.push('нет данных');
+  if(personId) metaParts.unshift(personId);
   document.getElementById('svMeta').textContent = metaParts.join(' · ');
 
   const content = document.getElementById('svContent');
@@ -1810,7 +1817,10 @@ function renderSubjectView(subj){
       subj.others.forEach((o, i) => {
         const s = othersScoresArr[i];
         const sum = summaryFromScores(s);
-        const rater = o.rater ? escapeHtml(o.rater) : '<i style="color:#a09aae;">анонимно</i>';
+        const raterNameShown = o.author_name || o.rater;
+        const rater = raterNameShown
+          ? escapeHtml(raterNameShown) + (o.author_id != null ? ' <span style="color:#a09aae;font-size:12px;">id ' + o.author_id + '</span>' : '')
+          : '<i style="color:#a09aae;">анонимно</i>';
         const date = new Date(o.ts).toLocaleDateString('ru-RU');
         const q = QUADRANTS[sum.quad];
         const sector = ANGLE_SECTORS[getAngleSector(sum.phi)];
@@ -2085,14 +2095,15 @@ function renderAdminTable(rows){
     wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>База пока пуста.</div>';
     return;
   }
-  const head = '<tr><th>Дата</th><th>Имя</th><th>Режим</th><th>Кто оценил</th><th>Я</th><th>Мы</th><th>Квадрант</th>'
+  const head = '<tr><th>Дата</th><th>id про кого</th><th>Псевдоним</th><th>Режим</th><th>id кто заполнил</th><th>Кто заполнил</th><th>Я</th><th>Мы</th><th>Квадрант</th>'
     + ADMIN_VECTORS.map(([, name]) => '<th>' + name + '</th>').join('') + '</tr>';
   const body = rows.map(r => {
     const when = r.ts ? new Date(r.ts).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
     const mode = r.mode === 'self' ? 'самооценка' : (r.mode === 'other' ? 'о другом' : '—');
     const scores = r.scores || {};
     const cells = [
-      when, r.subject || '', mode, r.rater || (r.mode === 'other' ? 'анонимно' : ''),
+      when, r.subject_id == null ? '' : r.subject_id, r.subject || '', mode,
+      r.author_id == null ? '' : r.author_id, r.author || r.rater || '',
       r.ya == null ? '' : r.ya, r.my == null ? '' : r.my, r.quadrant || ''
     ].concat(ADMIN_VECTORS.map(([id]) => scores[id] == null ? '' : scores[id]));
     return '<tr>' + cells.map(c => '<td>' + escapeHtml(c) + '</td>').join('') + '</tr>';

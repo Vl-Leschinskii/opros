@@ -19,9 +19,12 @@ GET    /api/health                 — проверка работоспособ
 GET    /api/subjects               — список профилей
 GET    /api/subjects/<имя>         — профиль: самооценка + оценки окружающих
 POST   /api/responses              — сохранить результат опроса
-         { "mode": "self" | "other", "subject": "Имя",
-           "rater": "Имя оценивающего" (необязательно),
+         { "mode": "self" | "other",
+           "subject": "псевдоним того, про кого анкета" (обязательно),
+           "rater": "псевдоним того, кто заполнил" (для other обязательно;
+                     для self совпадает с subject),
            "answers": [0..4 × 40], "overwrite": true|false }
+         Ответ содержит author_id и subject_id — id людей в таблице subjects.
 DELETE /api/subjects/<имя>         — удалить профиль со всеми оценками
 DELETE /api/subjects               — удалить все профили
 POST   /api/admin/login            — вход в админку {email, password}
@@ -97,6 +100,9 @@ CREATE INDEX IF NOT EXISTS responses_subject
     ON responses(subject_id, created_at);
 """
 
+# author_id добавляется миграцией: на уже созданной базе CREATE TABLE
+# не меняет существующую таблицу responses.
+
 
 class ApiError(Exception):
     def __init__(self, status, message):
@@ -119,6 +125,38 @@ def connect():
 def init_db():
     with connect() as conn:
         conn.executescript(SCHEMA)
+        migrate_author_id(conn)
+
+
+def migrate_author_id(conn):
+    """У каждого ответа есть author_id — кто заполнил, и subject_id — про кого."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(responses)")}
+    if "author_id" not in cols:
+        conn.execute(
+            "ALTER TABLE responses ADD COLUMN author_id INTEGER REFERENCES subjects(id)"
+        )
+    conn.execute(
+        """
+        UPDATE responses
+           SET author_id = subject_id
+         WHERE mode = 'self' AND author_id IS NULL
+        """
+    )
+    pending = conn.execute(
+        """
+        SELECT id, rater FROM responses
+         WHERE mode = 'other' AND author_id IS NULL AND trim(rater) != ''
+        """
+    ).fetchall()
+    for row in pending:
+        author = ensure_subject(conn, row["rater"])
+        conn.execute(
+            "UPDATE responses SET author_id = ? WHERE id = ?",
+            (author["id"], row["id"]),
+        )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS responses_author ON responses(author_id)"
+    )
 
 
 def now_ms():
@@ -189,9 +227,14 @@ def ensure_subject(conn, name):
 
 
 def response_to_dict(row):
+    keys = row.keys()
+    author_name = row["author_name"] if "author_name" in keys and row["author_name"] else row["rater"]
     return {
         "id": row["id"],
-        "rater": row["rater"],
+        "author_id": row["author_id"],
+        "author_name": author_name or "",
+        "subject_id": row["subject_id"],
+        "rater": author_name or row["rater"] or "",
         "answers": json.loads(row["answers"]),
         "scores": {vid: row["s_" + vid] for vid in VECTOR_IDS},
         "ya": row["ya"],
@@ -203,10 +246,16 @@ def response_to_dict(row):
 
 def build_profile(conn, subject):
     rows = conn.execute(
-        "SELECT * FROM responses WHERE subject_id = ? ORDER BY created_at, id",
+        """
+        SELECT r.*, a.name AS author_name
+          FROM responses r
+          LEFT JOIN subjects a ON a.id = r.author_id
+         WHERE r.subject_id = ?
+         ORDER BY r.created_at, r.id
+        """,
         (subject["id"],),
     ).fetchall()
-    profile = {"name": subject["name"], "self": None, "others": []}
+    profile = {"id": subject["id"], "name": subject["name"], "self": None, "others": []}
     for row in rows:
         item = response_to_dict(row)
         if row["mode"] == "self":
@@ -219,18 +268,20 @@ def build_profile(conn, subject):
 def list_subjects(conn):
     rows = conn.execute(
         """
-        SELECT s.name,
+        SELECT s.id, s.name,
                SUM(CASE WHEN r.mode = 'self'  THEN 1 ELSE 0 END) AS has_self,
                SUM(CASE WHEN r.mode = 'other' THEN 1 ELSE 0 END) AS others_count,
                MAX(r.created_at) AS updated_at
         FROM subjects s
         LEFT JOIN responses r ON r.subject_id = s.id
         GROUP BY s.id
+        HAVING COUNT(r.id) > 0
         ORDER BY s.name COLLATE NOCASE
         """
     ).fetchall()
     return [
         {
+            "id": r["id"],
             "name": r["name"],
             "has_self": bool(r["has_self"]),
             "others_count": r["others_count"] or 0,
@@ -244,15 +295,21 @@ def save_response(conn, payload):
     mode = payload.get("mode")
     if mode not in ("self", "other"):
         raise ApiError(400, "Поле «mode» должно быть 'self' или 'other'")
-    subject_name = validate_name(payload.get("subject"), "subject")
-    rater = validate_name(payload.get("rater"), "rater", required=False)
+    # subject — псевдоним того, про кого анкета. Для «о другом» он обязателен,
+    # чтобы все ответы об одном человеке сходились на одном id.
+    subject_name = validate_name(payload.get("subject"), "псевдоним")
     answers = validate_answers(payload.get("answers"))
     overwrite = bool(payload.get("overwrite"))
+    if mode == "other":
+        rater = validate_name(payload.get("rater"), "ваш псевдоним")
+    else:
+        rater = subject_name
 
     scores, ya, my, quadrant = compute_scores(answers)
 
     with conn:  # транзакция
         subject = ensure_subject(conn, subject_name)
+        author = subject if mode == "self" else ensure_subject(conn, rater)
         if mode == "self":
             existing = conn.execute(
                 "SELECT id FROM responses WHERE subject_id = ? AND mode = 'self'",
@@ -264,13 +321,13 @@ def save_response(conn, payload):
                 conn.execute("DELETE FROM responses WHERE id = ?", (existing["id"],))
         cur = conn.execute(
             """
-            INSERT INTO responses(subject_id, mode, rater, answers,
+            INSERT INTO responses(subject_id, author_id, mode, rater, answers,
                                   s_mysh, s_kozh, s_or, s_zr, s_an, s_ur, s_zv, s_ob,
                                   ya, my, quadrant, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                subject["id"], mode, rater, json.dumps(answers),
+                subject["id"], author["id"], mode, author["name"], json.dumps(answers),
                 scores["mysh"], scores["kozh"], scores["or"], scores["zr"],
                 scores["an"], scores["ur"], scores["zv"], scores["ob"],
                 ya, my, quadrant, now_ms(),
@@ -278,7 +335,13 @@ def save_response(conn, payload):
         )
         response_id = cur.lastrowid
 
-    return {"ok": True, "id": response_id, "subject": build_profile(conn, subject)}
+    return {
+        "ok": True,
+        "id": response_id,
+        "author_id": author["id"],
+        "subject_id": subject["id"],
+        "subject": build_profile(conn, subject),
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -289,7 +352,9 @@ ADMIN_COOKIE = "opros_admin"
 ADMIN_SESSION_MS = 14 * 24 * 60 * 60 * 1000
 
 CSV_COLUMNS = [
-    "response_id", "created_at", "subject", "mode", "rater",
+    "response_id", "created_at",
+    "author_id", "author", "subject_id", "subject",
+    "mode",
     "ya", "my", "quadrant",
     "mysh", "kozh", "or", "zr", "an", "ur", "zv", "ob",
 ] + [f"q{n:02d}" for n in range(1, N_QUESTIONS + 1)]
@@ -375,13 +440,15 @@ def iso_utc(ms):
 def load_admin_rows(conn):
     """Одна строка на ответ. Профиль без ответов тоже попадает в выгрузку."""
     query = """
-        SELECT s.name AS subject, s.created_at AS subject_created_at,
-               r.id AS response_id, r.created_at, r.mode, r.rater,
+        SELECT s.id AS subject_id, s.name AS subject, s.created_at AS subject_created_at,
+               r.id AS response_id, r.created_at, r.mode,
+               r.author_id, a.name AS author_name, r.rater,
                r.ya, r.my, r.quadrant,
                r.s_mysh, r.s_kozh, r.s_or, r.s_zr, r.s_an, r.s_ur, r.s_zv, r.s_ob,
                r.answers
         FROM subjects s
-        LEFT JOIN responses r ON r.subject_id = s.id
+        JOIN responses r ON r.subject_id = s.id
+        LEFT JOIN subjects a ON a.id = r.author_id
         ORDER BY s.name COLLATE NOCASE, r.created_at, r.id
     """
     rows = []
@@ -391,9 +458,12 @@ def load_admin_rows(conn):
             "response_id": rec["response_id"],
             "created_at": iso_utc(rec["created_at"] or rec["subject_created_at"]),
             "ts": rec["created_at"] or rec["subject_created_at"],
+            "subject_id": rec["subject_id"],
             "subject": rec["subject"],
+            "author_id": rec["author_id"],
+            "author": rec["author_name"] or rec["rater"] or "",
             "mode": rec["mode"] or "",
-            "rater": rec["rater"] or "",
+            "rater": rec["author_name"] or rec["rater"] or "",
             "ya": rec["ya"],
             "my": rec["my"],
             "quadrant": rec["quadrant"] or "",
@@ -412,9 +482,11 @@ def rows_to_csv(rows):
         item = {
             "response_id": row["response_id"] if row["response_id"] is not None else "",
             "created_at": row["created_at"],
+            "author_id": "" if row.get("author_id") is None else row["author_id"],
+            "author": row.get("author") or "",
+            "subject_id": "" if row.get("subject_id") is None else row["subject_id"],
             "subject": row["subject"],
             "mode": row["mode"],
-            "rater": row["rater"],
             "ya": "" if row["ya"] is None else row["ya"],
             "my": "" if row["my"] is None else row["my"],
             "quadrant": row["quadrant"],
@@ -615,6 +687,11 @@ class Handler(BaseHTTPRequestHandler):
                 subject = find_subject(conn, name)
                 if not subject:
                     raise ApiError(404, "Профиль не найден")
+                # Ответы этого человека о других остаются, но без ссылки на удалённый id.
+                conn.execute(
+                    "UPDATE responses SET author_id = NULL WHERE author_id = ? AND subject_id != ?",
+                    (subject["id"], subject["id"]),
+                )
                 conn.execute("DELETE FROM subjects WHERE id = ?", (subject["id"],))
             self._send_json({"ok": True})
             return True
