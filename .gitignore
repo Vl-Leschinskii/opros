@@ -1,0 +1,4 @@
+opros.db
+opros.db-wal
+opros.db-shm
+__pycache__/
