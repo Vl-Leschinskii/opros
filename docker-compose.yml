@@ -1,0 +1,20 @@
+# Опросник за шлюзом passion-gateway: https://217.160.139.56/opros/
+# Nginx проксирует /opros/ → 172.21.0.1:8090 (см. ~/passion/nginx/default.conf).
+
+services:
+  opros:
+    image: python:3.12-alpine
+    container_name: opros
+    restart: unless-stopped
+    user: "1001:1001"
+    working_dir: /app
+    command: ["python3", "-u", "server.py", "8080"]
+    environment:
+      HOST: 0.0.0.0
+      OPROS_DB: /app/data/opros.db
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - ./static:/app/static:ro
+      - ./data:/app/data
+    ports:
+      - "172.21.0.1:8090:8080"

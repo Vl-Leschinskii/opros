@@ -9,6 +9,7 @@
     python3 server.py              # http://0.0.0.0:8080
     python3 server.py 9000         # другой порт
     OPROS_DB=/path/to/base.db python3 server.py
+    docker compose up -d           # на хостинге, за nginx: /opros/
 
 Зависимости: только стандартная библиотека Python 3.
 

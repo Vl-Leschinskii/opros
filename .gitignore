@@ -1,4 +1,5 @@
 opros.db
 opros.db-wal
 opros.db-shm
+data/
 __pycache__/

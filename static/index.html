@@ -937,12 +937,14 @@ async function api(method, path, body){
   }
   return data;
 }
+/* Префикс, если страница открыта как /opros/ за обратным прокси. На корне сайта — пусто. */
+const BASE = (location.pathname === '/opros' || location.pathname.startsWith('/opros/')) ? '/opros' : '';
 const DB = {
-  listSubjects: () => api('GET', '/api/subjects').then(d => d.subjects),
-  getSubject:   name => api('GET', '/api/subjects/' + encodeURIComponent(name)),
-  saveResponse: payload => api('POST', '/api/responses', payload),
-  deleteSubject: name => api('DELETE', '/api/subjects/' + encodeURIComponent(name)),
-  clearAll:     () => api('DELETE', '/api/subjects')
+  listSubjects: () => api('GET', BASE + '/api/subjects').then(d => d.subjects),
+  getSubject:   name => api('GET', BASE + '/api/subjects/' + encodeURIComponent(name)),
+  saveResponse: payload => api('POST', BASE + '/api/responses', payload),
+  deleteSubject: name => api('DELETE', BASE + '/api/subjects/' + encodeURIComponent(name)),
+  clearAll:     () => api('DELETE', BASE + '/api/subjects')
 };
 function saveSelfResponse(name, answers, overwrite){
   return DB.saveResponse({ mode:'self', subject:name, answers:answers.slice(), overwrite: !!overwrite });
