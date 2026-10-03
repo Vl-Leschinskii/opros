@@ -24,8 +24,19 @@ POST   /api/responses              — сохранить результат о�
            "answers": [0..4 × 40], "overwrite": true|false }
 DELETE /api/subjects/<имя>         — удалить профиль со всеми оценками
 DELETE /api/subjects               — удалить все профили
+POST   /api/admin/login            — вход в админку {email, password}
+POST   /api/admin/logout           — выход
+GET    /api/admin/me               — текущая сессия
+GET    /api/admin/data             — содержимое базы (нужна сессия)
+GET    /api/admin/export.csv       — выгрузка базы в CSV (нужна сессия)
+GET    /admin                      — страница админки
 """
 
+import base64
+import csv
+import hashlib
+import hmac
+import io
 import json
 import os
 import sqlite3
@@ -271,6 +282,153 @@ def save_response(conn, payload):
 
 
 # ----------------------------------------------------------------------------
+# Админка: почта из списка + пароль ADMIN_TOKEN, сессия в подписанной cookie
+# ----------------------------------------------------------------------------
+
+ADMIN_COOKIE = "opros_admin"
+ADMIN_SESSION_MS = 14 * 24 * 60 * 60 * 1000
+
+CSV_COLUMNS = [
+    "response_id", "created_at", "subject", "mode", "rater",
+    "ya", "my", "quadrant",
+    "mysh", "kozh", "or", "zr", "an", "ur", "zv", "ob",
+] + [f"q{n:02d}" for n in range(1, N_QUESTIONS + 1)]
+
+
+def admin_emails():
+    raw = os.environ.get("ADMIN_EMAILS", "vleschinskii@gmail.com")
+    return [part.strip().lower() for part in raw.split(",") if part.strip()]
+
+
+def admin_secret():
+    secret = os.environ.get("ADMIN_TOKEN", "")
+    if not secret:
+        raise ApiError(503, "Админка не настроена: нет ADMIN_TOKEN")
+    return secret.encode("utf-8")
+
+
+def _sign(payload):
+    digest = hmac.new(admin_secret(), payload.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def check_admin_password(password):
+    expected = os.environ.get("ADMIN_TOKEN", "")
+    if not expected or not password:
+        return False
+    # Одинаковая длина дайджеста — сравнение не зависит от длины строк.
+    a = hmac.new(b"opros-admin-pw", password.encode("utf-8"), hashlib.sha256).digest()
+    b = hmac.new(b"opros-admin-pw", expected.encode("utf-8"), hashlib.sha256).digest()
+    return hmac.compare_digest(a, b)
+
+
+def create_admin_session(email):
+    exp = int(time.time() * 1000) + ADMIN_SESSION_MS
+    payload = f"{email}|{exp}"
+    return f"{payload}|{_sign(payload)}"
+
+
+def verify_admin_session(token):
+    if not token:
+        return None
+    parts = token.split("|")
+    if len(parts) != 3:
+        return None
+    email, exp_raw, sig = parts
+    try:
+        good = _sign(f"{email}|{exp_raw}")
+    except ApiError:
+        return None
+    if len(good) != len(sig) or not hmac.compare_digest(good, sig):
+        return None
+    try:
+        exp = int(exp_raw)
+    except ValueError:
+        return None
+    if exp < int(time.time() * 1000):
+        return None
+    if email not in admin_emails():
+        return None
+    return email
+
+
+def admin_cookie_header(value, max_age, secure):
+    path = os.environ.get("OPROS_PUBLIC_PREFIX", "").strip() or "/"
+    parts = [
+        f'{ADMIN_COOKIE}="{value}"',
+        f"Path={path}",
+        "HttpOnly",
+        "SameSite=Lax",
+        f"Max-Age={max_age}",
+    ]
+    if secure:
+        parts.append("Secure")
+    return "; ".join(parts)
+
+
+def iso_utc(ms):
+    if ms is None:
+        return ""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ms / 1000))
+
+
+def load_admin_rows(conn):
+    """Одна строка на ответ. Профиль без ответов тоже попадает в выгрузку."""
+    query = """
+        SELECT s.name AS subject, s.created_at AS subject_created_at,
+               r.id AS response_id, r.created_at, r.mode, r.rater,
+               r.ya, r.my, r.quadrant,
+               r.s_mysh, r.s_kozh, r.s_or, r.s_zr, r.s_an, r.s_ur, r.s_zv, r.s_ob,
+               r.answers
+        FROM subjects s
+        LEFT JOIN responses r ON r.subject_id = s.id
+        ORDER BY s.name COLLATE NOCASE, r.created_at, r.id
+    """
+    rows = []
+    for rec in conn.execute(query):
+        answers = json.loads(rec["answers"]) if rec["answers"] else []
+        rows.append({
+            "response_id": rec["response_id"],
+            "created_at": iso_utc(rec["created_at"] or rec["subject_created_at"]),
+            "ts": rec["created_at"] or rec["subject_created_at"],
+            "subject": rec["subject"],
+            "mode": rec["mode"] or "",
+            "rater": rec["rater"] or "",
+            "ya": rec["ya"],
+            "my": rec["my"],
+            "quadrant": rec["quadrant"] or "",
+            "scores": {vid: rec["s_" + vid] for vid in VECTOR_IDS} if rec["response_id"] else None,
+            "answers": answers,
+        })
+    return rows
+
+
+def rows_to_csv(rows):
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=CSV_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        scores = row["scores"] or {}
+        item = {
+            "response_id": row["response_id"] if row["response_id"] is not None else "",
+            "created_at": row["created_at"],
+            "subject": row["subject"],
+            "mode": row["mode"],
+            "rater": row["rater"],
+            "ya": "" if row["ya"] is None else row["ya"],
+            "my": "" if row["my"] is None else row["my"],
+            "quadrant": row["quadrant"],
+        }
+        for vid in VECTOR_IDS:
+            item[vid] = "" if row["scores"] is None else scores.get(vid, "")
+        for n in range(N_QUESTIONS):
+            answers = row["answers"]
+            item[f"q{n + 1:02d}"] = answers[n] if n < len(answers) else ""
+        writer.writerow(item)
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+
+# ----------------------------------------------------------------------------
 # HTTP
 # ----------------------------------------------------------------------------
 
@@ -289,9 +447,38 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    def _send_json(self, obj, status=200):
+    def _send_json(self, obj, status=200, extra_headers=None):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-        self._send_bytes(status, body, "application/json; charset=utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        for key, value in extra_headers or []:
+            self.send_header(key, value)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _cookies(self):
+        found = {}
+        for part in (self.headers.get("Cookie") or "").split(";"):
+            if "=" not in part:
+                continue
+            key, value = part.split("=", 1)
+            found[key.strip()] = value.strip().strip('"')
+        return found
+
+    def _admin_email(self):
+        return verify_admin_session(self._cookies().get(ADMIN_COOKIE))
+
+    def _require_admin(self):
+        email = self._admin_email()
+        if not email:
+            raise ApiError(401, "Нужен вход")
+        return email
+
+    def _secure_cookie(self):
+        return (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower() == "https"
 
     def _send_file(self, filename, content_type):
         path = os.path.join(STATIC_DIR, filename)
@@ -342,8 +529,30 @@ class Handler(BaseHTTPRequestHandler):
     # --- маршруты ----------------------------------------------------------
 
     def _handle_GET(self, path):
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html", "/admin", "/admin/"):
             self._send_file("index.html", "text/html; charset=utf-8")
+            return True
+        if path == "/api/admin/me":
+            email = self._require_admin()
+            self._send_json({"email": email})
+            return True
+        if path == "/api/admin/data":
+            self._require_admin()
+            with connect() as conn:
+                self._send_json({"rows": load_admin_rows(conn)})
+            return True
+        if path == "/api/admin/export.csv":
+            self._require_admin()
+            with connect() as conn:
+                body = rows_to_csv(load_admin_rows(conn))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Disposition", 'attachment; filename="opros.csv"')
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
             return True
         if path == "/api/health":
             self._send_json({"ok": True, "db": DB_PATH})
@@ -366,6 +575,25 @@ class Handler(BaseHTTPRequestHandler):
         return self._handle_GET(path)
 
     def _handle_POST(self, path):
+        if path == "/api/admin/login":
+            payload = self._read_json()
+            email = str(payload.get("email") or "").strip().lower()
+            password = str(payload.get("password") or "")
+            if not os.environ.get("ADMIN_TOKEN"):
+                raise ApiError(503, "Админка не настроена: нет ADMIN_TOKEN")
+            if email not in admin_emails() or not check_admin_password(password):
+                raise ApiError(401, "Неверная почта или пароль")
+            cookie = admin_cookie_header(
+                create_admin_session(email),
+                max_age=ADMIN_SESSION_MS // 1000,
+                secure=self._secure_cookie(),
+            )
+            self._send_json({"ok": True, "email": email}, extra_headers=[("Set-Cookie", cookie)])
+            return True
+        if path == "/api/admin/logout":
+            cookie = admin_cookie_header("", max_age=0, secure=self._secure_cookie())
+            self._send_json({"ok": True}, extra_headers=[("Set-Cookie", cookie)])
+            return True
         if path == "/api/responses":
             payload = self._read_json()
             with connect() as conn:

@@ -9,9 +9,13 @@ services:
     user: "1001:1001"
     working_dir: /app
     command: ["python3", "-u", "server.py", "8080"]
+    env_file:
+      - .env
     environment:
       HOST: 0.0.0.0
       OPROS_DB: /app/data/opros.db
+      OPROS_PUBLIC_PREFIX: /opros
+      ADMIN_EMAILS: vleschinskii@gmail.com
     volumes:
       - ./server.py:/app/server.py:ro
       - ./static:/app/static:ro

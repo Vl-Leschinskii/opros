@@ -30,7 +30,7 @@
   header.top .brand{font-family:Georgia,serif;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;}
   header.top h1{font-family:Georgia,serif;font-size:26px;font-weight:400;letter-spacing:.01em;line-height:1.3;}
   header.top h1 .amp{color:var(--gold);font-style:italic}
-  .main-nav{display:flex;gap:8px;justify-content:center;margin-top:18px;}
+  .main-nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px;}
   .nav-btn{padding:9px 22px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:all .15s ease;}
   .nav-btn:hover{border-color:var(--gold);color:var(--gold);}
   .nav-btn.active{background:var(--gold-bg);border-color:var(--gold);color:var(--gold);}
@@ -116,14 +116,11 @@
   .z-numbers .big{font-size:15px;color:var(--ink);}
   .z-numbers .lbl{color:#a09aae;font-size:12px;font-style:italic;}
   .z-numbers .phi-bal{color:var(--purple);font-weight:700;font-family:Georgia,serif;}
-  .z-numbers .phi-raw{color:var(--gold);font-family:Georgia,serif;}
   .z-numbers .dev{color:var(--ink);font-weight:700;font-family:Georgia,serif;}
   .angle-legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:14px;font-size:12px;color:var(--muted);}
   .angle-legend .al-item{display:flex;align-items:center;gap:6px;}
   .angle-legend .al-line{display:inline-block;width:22px;height:2px;border-radius:1px;}
   .angle-legend .al-line.bal{background:var(--purple);}
-  .angle-legend .al-line.raw{background:var(--gold);border-top:1px dashed var(--gold);height:1px;}
-  .angle-legend .al-line.vec{background:var(--ink);height:2.5px;}
   .plane-wrap{margin:22px auto 0;max-width:420px;}
   svg.plane{width:100%;height:auto;display:block}
 
@@ -320,6 +317,15 @@
   .profile-item .pi-meta .badge.self{background:var(--gold-bg);color:#6b5210;}
   .profile-item .pi-meta .badge.other{background:var(--purple-bg);color:#4a3170;}
   .profile-item .pi-arrow{color:var(--muted);font-size:20px;}
+  a.btn{text-decoration:none;}
+  .admin-scroll{overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:16px;}
+  .admin-table{width:100%;border-collapse:collapse;font-size:13px;min-width:920px;}
+  .admin-table th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:#fbfaf6;position:sticky;top:0;}
+  .admin-table td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;color:#4a4460;}
+  .admin-table tr:last-child td{border-bottom:none;}
+  .admin-error{color:#a8433a;font-size:13.5px;margin-top:12px;min-height:1.2em;}
+  .admin-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
   .empty-state{text-align:center;padding:40px 20px;color:#a09aae;font-size:14.5px;line-height:1.6;}
   .empty-state .es-icon{font-family:Georgia,serif;font-size:40px;color:var(--line);display:block;margin-bottom:12px;}
 
@@ -531,9 +537,7 @@
         <svg class="plane" viewBox="0 0 400 400" id="planeSvg"></svg>
       </div>
       <div class="angle-legend">
-        <div class="al-item"><span class="al-line vec"></span>Вектор z (от нуля)</div>
         <div class="al-item"><span class="al-line bal"></span>φ — от баланса (40, 40)</div>
-        <div class="al-item"><span class="al-line raw"></span>φ₀ — классический от нуля</div>
       </div>
     </div>
 
@@ -724,6 +728,35 @@
       <div class="res-actions" style="justify-content:flex-start;margin-top:22px">
         <button class="btn ghost" onclick="navTo('intro')">← На главную</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ================= ADMIN ================= -->
+  <section id="admin">
+    <div class="setup-card" id="adminLogin">
+      <div class="setup-step">Только для разрешённого адреса</div>
+      <h2>Админка</h2>
+      <p class="setup-desc">Просмотр базы опросов и выгрузка в CSV.</p>
+      <label class="field-label" for="adminEmail">Эл. почта</label>
+      <input id="adminEmail" class="field-input" type="email" value="vleschinskii@gmail.com" autocomplete="username" maxlength="80">
+      <label class="field-label" for="adminPassword">Пароль</label>
+      <input id="adminPassword" class="field-input" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')adminLogin()">
+      <div class="admin-error" id="adminLoginError"></div>
+      <div class="setup-actions">
+        <button class="btn ghost" onclick="navTo('intro')">← На главную</button>
+        <button class="btn" id="adminLoginBtn" onclick="adminLogin()">Войти</button>
+      </div>
+    </div>
+    <div class="profiles-card" id="adminPanel" style="display:none">
+      <div class="profiles-head">
+        <h2>База опросов</h2>
+        <div class="admin-actions">
+          <a class="btn small" id="adminExport" href="#">Скачать CSV</a>
+          <button class="btn ghost small" onclick="adminLogout()">Выйти</button>
+        </div>
+      </div>
+      <p class="profiles-desc" id="adminMeta"></p>
+      <div class="admin-scroll" id="adminTable"></div>
     </div>
   </section>
 
@@ -971,6 +1004,9 @@ let currentViewSubject = null;
 let lastSave = { state:'idle', profile:null, error:null, name:'' }; // статус сохранения результата в БД
 
 function show(id){
+  if(id !== 'admin' && /\/admin\/?$/.test(location.pathname)){
+    history.pushState({}, '', (BASE || '') + '/');
+  }
   document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
@@ -1125,12 +1161,11 @@ function summaryFromScores(s){
   const mod = Math.sqrt(Ya*Ya + My*My);
   const modMax = Math.sqrt(80*80 + 80*80);
   const modPct = Math.round(mod/modMax*100);
-  const phiRaw = (Ya === 0 && My === 0) ? 0 : Math.atan2(My, Ya) * 180 / Math.PI;
   const dx = Ya - 40, dy = My - 40;
   const dev = Math.sqrt(dx*dx + dy*dy);
   const phi = (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) ? 0 : Math.atan2(dy, dx) * 180 / Math.PI;
   const quad = getQuadrantKey(Ya, My);
-  return { s, Ya, My, YaLow, YaHigh, MyLow, MyHigh, Save, Change, mod, modPct, phi, phiRaw, dev, quad };
+  return { s, Ya, My, YaLow, YaHigh, MyLow, MyHigh, Save, Change, mod, modPct, phi, dev, quad };
 }
 function fmt1(x){ return (Math.round(x*10)/10).toString(); }
 function fmtAngle(deg){ const d = Math.round(deg); return d === 0 ? '0' : d.toString(); }
@@ -1165,7 +1200,7 @@ async function submitOtherResult(){
 }
 
 function renderResultView(sum, opts){
-  const {s, Ya, My, YaLow, YaHigh, MyLow, MyHigh, Save, Change, modPct, phi, phiRaw, dev, quad} = sum;
+  const {s, Ya, My, YaLow, YaHigh, MyLow, MyHigh, Save, Change, modPct, phi, dev, quad} = sum;
 
   document.getElementById('resEyebrow').textContent = opts.eyebrow || 'Ваше комплексное число личности';
   document.getElementById('zDisplay').innerHTML =
@@ -1173,8 +1208,7 @@ function renderResultView(sum, opts){
   document.getElementById('zNumbers').innerHTML =
     '<span class="big">|z| = ' + Math.round(sum.mod) + '</span> <span class="lbl">(' + modPct + '% от максимума)</span><br>' +
     '<span class="lbl">φ от баланса (40, 40):</span> <span class="phi-bal">' + fmtAngle(phi) + '°</span>' +
-    ' &nbsp;·&nbsp; <span class="lbl">d =</span> <span class="dev">' + fmt1(dev) + '</span>' +
-    ' &nbsp;·&nbsp; <span class="lbl">φ₀ от нуля:</span> <span class="phi-raw">' + Math.round(phiRaw) + '°</span>';
+    ' &nbsp;·&nbsp; <span class="lbl">d =</span> <span class="dev">' + fmt1(dev) + '</span>';
 
   const now = new Date();
   document.getElementById('phDate').textContent =
@@ -1184,7 +1218,7 @@ function renderResultView(sum, opts){
     ? 'Оценка: ' + (opts.subjectLabel || 'другой человек')
     : 'Результат самоидентификации';
 
-  drawPlane(Ya, My, phi, phiRaw);
+  drawPlane(Ya, My, phi);
   renderQuadrantPanel(quad);
   renderAnglePanel(sum);
 
@@ -1428,7 +1462,7 @@ function renderQuadrantPanel(key){
   document.getElementById('qVerdict').innerHTML = q.verdict;
 }
 
-function drawPlane(Ya, My, phi, phiRaw){
+function drawPlane(Ya, My, phi){
   const svg = document.getElementById('planeSvg');
   svg.setAttribute('viewBox','0 0 400 400');
   const NS = 'http://www.w3.org/2000/svg';
@@ -1469,18 +1503,6 @@ function drawPlane(Ya, My, phi, phiRaw){
   el('text',{x:120,y:340,fill:'#7a7290','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'III · Кокон');
   el('text',{x:280,y:340,fill:'#b8912f','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'IV · Ось');
 
-  if(phiRaw > 0.5){
-    const r0 = 52;
-    const ex = ox + r0 * Math.cos(phiRaw*Math.PI/180);
-    const ey = oy - r0 * Math.sin(phiRaw*Math.PI/180);
-    const p0 = document.createElementNS(NS,'path');
-    p0.setAttribute('d', 'M ' + (ox+r0) + ' ' + oy + ' A ' + r0 + ' ' + r0 + ' 0 0 0 ' + ex + ' ' + ey);
-    p0.setAttribute('fill','none'); p0.setAttribute('stroke','#b8912f');
-    p0.setAttribute('stroke-width','1'); p0.setAttribute('stroke-dasharray','3 3'); p0.setAttribute('opacity','.7');
-    svg.appendChild(p0);
-    el('text',{x: ox + (r0+12)*Math.cos(phiRaw/2*Math.PI/180), y: oy - (r0+12)*Math.sin(phiRaw/2*Math.PI/180) + 4, fill:'#b8912f','font-size':10,'font-family':'Georgia,serif','text-anchor':'middle','opacity':.85}, 'φ₀');
-  }
-
   const dx = Ya - 40, dy = My - 40;
   if(Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01){
     const rb = 38;
@@ -1496,7 +1518,6 @@ function drawPlane(Ya, My, phi, phiRaw){
     el('line',{x1:bx,y1:by,x2:px,y2:py,stroke:'#6b4c9a','stroke-width':1.2,'stroke-dasharray':'4 4',opacity:.75});
   }
 
-  el('line',{x1:ox,y1:oy,x2:px,y2:py,stroke:'#241f38','stroke-width':2.2,'stroke-linecap':'round'});
   el('circle',{cx:bx,cy:by,r:3.5,fill:'#7a7290'});
   el('circle',{cx:px,cy:py,r:8,fill:'#241f38'});
   el('circle',{cx:px,cy:py,r:3.5,fill:'#fff'});
@@ -1580,7 +1601,6 @@ function renderDiagnosis(s, sum, quad, isOther){
   add('Мы: '+sum.My+'/80', 'g');
   add('|z|: '+sum.modPct+'%', '');
   add('φ: '+fmtAngle(sum.phi)+'°', 'p');
-  add('φ₀: '+Math.round(sum.phiRaw)+'°', '');
   add('d: '+fmt1(sum.dev), 'g');
   add('Доминанта: '+dom.name, '');
   add('Опора: '+second.name, 'p');
@@ -1731,7 +1751,6 @@ function renderSubjectView(subj){
           '<span class="big">|z| = ' + Math.round(displaySum.mod) + '</span> <span class="lbl">(' + displaySum.modPct + '%)</span><br>' +
           '<span class="lbl">φ от баланса:</span> <span class="phi-bal">' + fmtAngle(displaySum.phi) + '°</span>' +
           ' &nbsp;·&nbsp; <span class="lbl">d =</span> <span class="dev">' + fmt1(displaySum.dev) + '</span>' +
-          ' &nbsp;·&nbsp; <span class="lbl">φ₀:</span> <span class="phi-raw">' + Math.round(displaySum.phiRaw) + '°</span>' +
         '</div>' +
       '</div>'
     );
@@ -1977,7 +1996,6 @@ function copyResult(){
   txt += 'z = ' + sum.Ya + ' + i·' + sum.My + '\n';
   txt += '|z| = ' + Math.round(sum.mod) + ' (' + sum.modPct + '%)\n';
   txt += 'φ от баланса (40, 40) = ' + fmtAngle(sum.phi) + '°\n';
-  txt += 'φ₀ от начала (0, 0)  = ' + Math.round(sum.phiRaw) + '°\n';
   txt += 'd — расстояние от баланса = ' + fmt1(sum.dev) + '\n\n';
   txt += 'Профиль векторов:\n';
   sorted.forEach(v=>{ txt += '  ' + v.name.padEnd(14,' ') + ' ' + sum.s[v.id] + '/20\n'; });
@@ -2002,7 +2020,92 @@ function showToast(msg){
   setTimeout(()=> t.classList.remove('show'), 2200);
 }
 
-updateProfileCount();
+const ADMIN_VECTORS = [
+  ['mysh','Мыш'], ['kozh','Кож'], ['or','Ор'], ['zr','Зр'],
+  ['an','Ан'], ['ur','Ур'], ['zv','Зв'], ['ob','Об']
+];
+function isAdminPath(){ return /\/admin\/?$/.test(location.pathname); }
+function openAdmin(fromPop){
+  if(!fromPop && !isAdminPath()) history.pushState({view:'admin'}, '', (BASE || '') + '/admin');
+  show('admin');
+  refreshAdmin();
+}
+function showAdminLogin(){
+  document.getElementById('adminLogin').style.display = '';
+  document.getElementById('adminPanel').style.display = 'none';
+}
+function showAdminPanel(email){
+  document.getElementById('adminLogin').style.display = 'none';
+  document.getElementById('adminPanel').style.display = '';
+  document.getElementById('adminExport').href = BASE + '/api/admin/export.csv';
+  document.getElementById('adminMeta').textContent = 'Сессия: ' + email;
+}
+async function refreshAdmin(){
+  document.getElementById('adminLoginError').textContent = '';
+  try {
+    const me = await api('GET', BASE + '/api/admin/me');
+    showAdminPanel(me.email);
+    const data = await api('GET', BASE + '/api/admin/data');
+    renderAdminTable(data.rows || []);
+  } catch(e){
+    showAdminLogin();
+    if(e.status !== 401) document.getElementById('adminLoginError').textContent = e.message;
+  }
+}
+async function adminLogin(){
+  const email = document.getElementById('adminEmail').value.trim();
+  const password = document.getElementById('adminPassword').value;
+  const err = document.getElementById('adminLoginError');
+  const btn = document.getElementById('adminLoginBtn');
+  err.textContent = '';
+  if(!email || !password){ err.textContent = 'Введите почту и пароль'; return; }
+  btn.disabled = true;
+  try {
+    await api('POST', BASE + '/api/admin/login', {email, password});
+    document.getElementById('adminPassword').value = '';
+    await refreshAdmin();
+  } catch(e){
+    err.textContent = e.status === 401 ? 'Неверная почта или пароль' : e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function adminLogout(){
+  try { await api('POST', BASE + '/api/admin/logout', {}); }
+  catch(e){ /* сессия всё равно сбрасывается на экране */ }
+  showAdminLogin();
+}
+function renderAdminTable(rows){
+  const wrap = document.getElementById('adminTable');
+  const filled = rows.filter(r => r.response_id != null);
+  const meta = document.getElementById('adminMeta');
+  const who = meta.textContent;
+  meta.textContent = who + ' · записей: ' + filled.length;
+  if(!rows.length){
+    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>База пока пуста.</div>';
+    return;
+  }
+  const head = '<tr><th>Дата</th><th>Имя</th><th>Режим</th><th>Кто оценил</th><th>Я</th><th>Мы</th><th>Квадрант</th>'
+    + ADMIN_VECTORS.map(([, name]) => '<th>' + name + '</th>').join('') + '</tr>';
+  const body = rows.map(r => {
+    const when = r.ts ? new Date(r.ts).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+    const mode = r.mode === 'self' ? 'самооценка' : (r.mode === 'other' ? 'о другом' : '—');
+    const scores = r.scores || {};
+    const cells = [
+      when, r.subject || '', mode, r.rater || (r.mode === 'other' ? 'анонимно' : ''),
+      r.ya == null ? '' : r.ya, r.my == null ? '' : r.my, r.quadrant || ''
+    ].concat(ADMIN_VECTORS.map(([id]) => scores[id] == null ? '' : scores[id]));
+    return '<tr>' + cells.map(c => '<td>' + escapeHtml(c) + '</td>').join('') + '</tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="admin-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+window.addEventListener('popstate', () => {
+  if(isAdminPath()) openAdmin(true);
+  else show('intro');
+});
+
+if(isAdminPath()) openAdmin(true);
+else updateProfileCount();
 </script>
 </body>
 </html>

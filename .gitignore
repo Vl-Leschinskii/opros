@@ -1,3 +1,4 @@
+.env
 opros.db
 opros.db-wal
 opros.db-shm
