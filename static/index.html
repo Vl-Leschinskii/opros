@@ -448,7 +448,7 @@
         <button class="mode-card" onclick="chooseMode('self')">
           <span class="mc-icon">◉</span>
           <div class="mc-title">Я о себе</div>
-          <div class="mc-desc">Пройдите опросник о себе. Псевдоним обязателен: по нему сохраняется ваша самооценка, и к ней потом добавляются оценки других.</div>
+          <div class="mc-desc">Пройдите опросник о себе. Псевдоним обязателен: по нему сохраняется ваша самооценка, и к ней потом добавляются оценки других. Сводный профиль увидите только вы — в этом браузере.</div>
         </button>
         <button class="mode-card purple" onclick="chooseMode('other')">
           <span class="mc-icon">◌</span>
@@ -458,7 +458,7 @@
       </div>
       <div class="intro-links">
         <button class="btn ghost small" onclick="navTo('typology')">Изучить типологию</button>
-        <button class="btn ghost small" onclick="showProfiles()">Сохранённые профили <span id="profileCount2"></span></button>
+        <button class="btn ghost small" onclick="showProfiles()">Мои профили <span id="profileCount2"></span></button>
       </div>
       <div class="scale-note">
         <b>Как отвечать.</b> Оцените каждое утверждение по шкале:
@@ -722,10 +722,9 @@
   <section id="profiles">
     <div class="profiles-card">
       <div class="profiles-head">
-        <h2>Сохранённые профили</h2>
-        <button class="btn danger small" onclick="clearAllProfiles()">Очистить все</button>
+        <h2>Мои профили</h2>
       </div>
-      <p class="profiles-desc">У каждого псевдонима свой id. Ответы «о себе» и «о другом» с одним и тем же псевдонимом собираются в один профиль. Чтобы добавить чужую оценку, отправьте ссылку и попросите ввести тот же псевдоним.</p>
+      <p class="profiles-desc">Здесь только профили, по которым вы заполнили «Я о себе» в этом браузере. Сводный профиль — самооценку и оценки окружающих — видит только тот, кто его заполнил; другим участникам он не показывается. Чтобы добавить чужую оценку, отправьте ссылку и попросите ввести ваш псевдоним в режиме «Я о другом».</p>
       <div class="profile-list" id="profilesList"></div>
       <div class="res-actions" style="justify-content:flex-start;margin-top:22px">
         <button class="btn ghost" onclick="navTo('intro')">← На главную</button>
@@ -975,11 +974,13 @@ async function api(method, path, body){
 /* Префикс, если страница открыта как /opros/ за обратным прокси. На корне сайта — пусто. */
 const BASE = (location.pathname === '/opros' || location.pathname.startsWith('/opros/')) ? '/opros' : '';
 const DB = {
+  /* Только мои профили: те, по которым «Я о себе» заполнено из этого браузера (cookie). */
   listSubjects: () => api('GET', BASE + '/api/subjects').then(d => d.subjects),
+  /* Все псевдонимы — только для подсказок при вводе, без содержимого профилей. */
+  listNames:    () => api('GET', BASE + '/api/subjects').then(d => d.names || []),
   getSubject:   name => api('GET', BASE + '/api/subjects/' + encodeURIComponent(name)),
   saveResponse: payload => api('POST', BASE + '/api/responses', payload),
-  deleteSubject: name => api('DELETE', BASE + '/api/subjects/' + encodeURIComponent(name)),
-  clearAll:     () => api('DELETE', BASE + '/api/subjects')
+  deleteSubject: name => api('DELETE', BASE + '/api/subjects/' + encodeURIComponent(name))
 };
 function saveSelfResponse(name, answers, overwrite){
   return DB.saveResponse({ mode:'self', subject:name, answers:answers.slice(), overwrite: !!overwrite });
@@ -988,12 +989,6 @@ function saveOtherResponse(subjectName, raterName, answers){
   return DB.saveResponse({ mode:'other', subject:subjectName, rater:(raterName||'').trim(), answers:answers.slice() });
 }
 function deleteSubject(name){ return DB.deleteSubject(name); }
-async function clearAll(){
-  if(!confirm('Удалить все сохранённые профили из базы данных? Действие необратимо.')) return;
-  try { await DB.clearAll(); showToast('Все профили удалены'); }
-  catch(e){ showToast(e.message); }
-  showProfiles();
-}
 
 /* ============================================================
    СОСТОЯНИЕ
@@ -1050,9 +1045,11 @@ function chooseMode(m){
   document.getElementById('raterBlock').style.display = isSelf ? 'none' : '';
   const dl = document.getElementById('subjectList');
   dl.innerHTML = '';
-  DB.listSubjects().then(list => {
-    list.forEach(s => { const opt = document.createElement('option'); opt.value = s.name; dl.appendChild(opt); });
-  }).catch(()=>{});
+  if(!isSelf){
+    DB.listNames().then(names => {
+      names.forEach(n => { const opt = document.createElement('option'); opt.value = n; dl.appendChild(opt); });
+    }).catch(()=>{});
+  }
   document.getElementById('subjectNameInput').value = '';
   document.getElementById('raterNameInput').value = '';
   show('subjectSetup');
@@ -1404,8 +1401,8 @@ function renderSavePanel(){
   }
   if(st === 'saved'){
     const subj = lastSave.profile;
-    const countOthers = subj ? subj.others.length : 0;
-    const hasSelf = !!(subj && subj.self);
+    const countOthers = subj ? (subj.others_count != null ? subj.others_count : (subj.others || []).length) : 0;
+    const hasSelf = !!(subj && (subj.has_self || subj.self));
     panel.className = 'save-panel saved';
     const who = lastSave.authorId ? 'Кто заполнил: id <b>' + lastSave.authorId + '</b>' + (mode === 'self' ? '' : ' «' + escapeHtml(raterName) + '»') + '. ' : '';
     const about = 'Про кого: id <b>' + (lastSave.subjectId || (subj && subj.id) || '—') + '</b> «' + escapeHtml(lastSave.name) + '». ';
@@ -1414,15 +1411,18 @@ function renderSavePanel(){
         '<div class="sp-label">Самооценка сохранена</div>' +
         '<div class="sp-hint">' + who + about +
           (countOthers ? 'Оценок от окружающих: <b>' + countOthers + '</b>.' : 'Оценок от окружающих пока нет. Пусть знакомые пройдут «Я о другом» и введут псевдоним <b>' + escapeHtml(lastSave.name) + '</b>.') +
+          ' Сводный профиль виден только вам и только в этом браузере.' +
           profileLink(lastSave.name) +
         '</div>';
     } else {
+      /* Сводный профиль другого человека оценившему не показывается — он виден только тому, кто заполнил «Я о себе». */
       panel.innerHTML =
         '<div class="sp-label">Оценка сохранена</div>' +
         '<div class="sp-hint">' + who + about +
           'Всего оценок от окружающих: <b>' + countOthers + '</b>. ' +
-          (hasSelf ? 'Самооценка тоже есть — можно сравнить.' : 'Самооценки пока нет.') +
-          profileLink(lastSave.name) + '</div>';
+          (hasSelf ? 'Самооценка у этого человека есть.' : 'Самооценки пока нет.') +
+          ' Сводный профиль «' + escapeHtml(lastSave.name) + '» увидит только он(а) сам(а) — в том браузере, где заполнял(а) «Я о себе».' +
+        '</div>';
     }
     return;
   }
@@ -1685,7 +1685,7 @@ async function showProfiles(){
   list.innerHTML = '';
   subjects.sort((a,b)=> a.name.localeCompare(b.name, 'ru'));
   if(subjects.length === 0){
-    list.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>Пока нет сохранённых профилей.</div>';
+    list.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>У вас пока нет профилей.<br><span style="font-size:13px;">Пройдите «Я о себе» — профиль появится здесь. Если вы уже проходили опрос с другого устройства или после очистки cookie, он останется привязан к тому браузеру.</span></div>';
   } else {
     subjects.forEach(subj=>{
       const name = subj.name;
@@ -1705,13 +1705,16 @@ async function showProfiles(){
   }
   updateProfileCount();
 }
-function clearAllProfiles(){ clearAll(); }
-
 function viewSubjectByName(name){ viewSubject(name); }
 async function viewSubject(name){
   let subj;
   try { subj = await DB.getSubject(name); }
-  catch(e){ showToast(e.status === 404 ? 'Профиль не найден' : e.message); return; }
+  catch(e){
+    if(e.status === 404) showToast('Профиль не найден');
+    else if(e.status === 403) showToast('Этот профиль виден только тому, кто заполнил «Я о себе» под этим псевдонимом');
+    else showToast(e.message);
+    return;
+  }
   currentViewSubject = subj.name;
   renderSubjectView(subj);
   const now = new Date();

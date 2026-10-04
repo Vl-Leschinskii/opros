@@ -13,11 +13,21 @@
 
 Зависимости: только стандартная библиотека Python 3.
 
+Доступ к профилям
+-----------------
+Браузер посетителя получает cookie opros_visitor со случайным токеном.
+Тот, кто заполнил «Я о себе», становится владельцем профиля: в subjects
+хранится хэш его токена. Сводный профиль (самооценка + оценки окружающих)
+видит только владелец из своего браузера (или админ). Остальные участники
+чужие профили не видят — ни список, ни содержимое.
+
 REST API
 --------
 GET    /api/health                 — проверка работоспособности
-GET    /api/subjects               — список профилей
+GET    /api/subjects               — мои профили (владелец — этот браузер)
+                                     + names: все псевдонимы для подсказок
 GET    /api/subjects/<имя>         — профиль: самооценка + оценки окружающих
+                                     (только владелец или админ, иначе 403)
 POST   /api/responses              — сохранить результат опроса
          { "mode": "self" | "other",
            "subject": "псевдоним того, про кого анкета" (обязательно),
@@ -25,8 +35,12 @@ POST   /api/responses              — сохранить результат о�
                      для self совпадает с subject),
            "answers": [0..4 × 40], "overwrite": true|false }
          Ответ содержит author_id и subject_id — id людей в таблице subjects.
+         Для self возвращается полный профиль, для other — только счётчики.
+         Самооценку под чужим псевдонимом (владелец — другой браузер)
+         перезаписать нельзя: 403.
 DELETE /api/subjects/<имя>         — удалить профиль со всеми оценками
-DELETE /api/subjects               — удалить все профили
+                                     (только владелец или админ)
+DELETE /api/subjects               — удалить все профили (только админ)
 POST   /api/admin/login            — вход в админку {email, password}
 POST   /api/admin/logout           — выход
 GET    /api/admin/me               — текущая сессия
@@ -42,6 +56,7 @@ import hmac
 import io
 import json
 import os
+import secrets
 import sqlite3
 import sys
 import time
@@ -100,8 +115,11 @@ CREATE INDEX IF NOT EXISTS responses_subject
     ON responses(subject_id, created_at);
 """
 
-# author_id добавляется миграцией: на уже созданной базе CREATE TABLE
-# не меняет существующую таблицу responses.
+# author_id (responses) и owner_hash (subjects) добавляются миграциями:
+# на уже созданной базе CREATE TABLE не меняет существующие таблицы.
+
+VISITOR_COOKIE = "opros_visitor"
+VISITOR_COOKIE_MAX_AGE = 10 * 365 * 24 * 60 * 60  # секунды
 
 
 class ApiError(Exception):
@@ -126,6 +144,31 @@ def init_db():
     with connect() as conn:
         conn.executescript(SCHEMA)
         migrate_author_id(conn)
+        migrate_owner_hash(conn)
+
+
+def migrate_owner_hash(conn):
+    """owner_hash — хэш cookie-токена браузера, из которого заполнена самооценка."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(subjects)")}
+    if "owner_hash" not in cols:
+        conn.execute("ALTER TABLE subjects ADD COLUMN owner_hash TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS subjects_owner ON subjects(owner_hash)"
+    )
+
+
+def new_visitor_token():
+    return secrets.token_urlsafe(32)
+
+
+def visitor_hash(token):
+    if not token:
+        return None
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def is_owner(subject, owner_hash):
+    return bool(owner_hash) and subject["owner_hash"] == owner_hash
 
 
 def migrate_author_id(conn):
@@ -265,7 +308,40 @@ def build_profile(conn, subject):
     return profile
 
 
-def list_subjects(conn):
+def subject_summary(conn, subject):
+    """Только счётчики, без ответов — это можно показать и не владельцу."""
+    row = conn.execute(
+        """
+        SELECT SUM(CASE WHEN mode = 'self'  THEN 1 ELSE 0 END) AS has_self,
+               SUM(CASE WHEN mode = 'other' THEN 1 ELSE 0 END) AS others_count
+          FROM responses WHERE subject_id = ?
+        """,
+        (subject["id"],),
+    ).fetchone()
+    return {
+        "id": subject["id"],
+        "name": subject["name"],
+        "has_self": bool(row["has_self"]),
+        "others_count": row["others_count"] or 0,
+    }
+
+
+def list_names(conn):
+    """Псевдонимы всех людей, по которым есть ответы — для подсказок при вводе."""
+    rows = conn.execute(
+        """
+        SELECT s.name FROM subjects s
+         WHERE EXISTS (SELECT 1 FROM responses r WHERE r.subject_id = s.id)
+         ORDER BY s.name COLLATE NOCASE
+        """
+    ).fetchall()
+    return [r["name"] for r in rows]
+
+
+def list_subjects(conn, owner_hash):
+    """Профили, владелец которых — этот браузер. Без токена список пуст."""
+    if not owner_hash:
+        return []
     rows = conn.execute(
         """
         SELECT s.id, s.name,
@@ -274,10 +350,12 @@ def list_subjects(conn):
                MAX(r.created_at) AS updated_at
         FROM subjects s
         LEFT JOIN responses r ON r.subject_id = s.id
+        WHERE s.owner_hash = ?
         GROUP BY s.id
         HAVING COUNT(r.id) > 0
         ORDER BY s.name COLLATE NOCASE
-        """
+        """,
+        (owner_hash,),
     ).fetchall()
     return [
         {
@@ -291,7 +369,7 @@ def list_subjects(conn):
     ]
 
 
-def save_response(conn, payload):
+def save_response(conn, payload, owner_hash):
     mode = payload.get("mode")
     if mode not in ("self", "other"):
         raise ApiError(400, "Поле «mode» должно быть 'self' или 'other'")
@@ -311,14 +389,28 @@ def save_response(conn, payload):
         subject = ensure_subject(conn, subject_name)
         author = subject if mode == "self" else ensure_subject(conn, rater)
         if mode == "self":
+            if not owner_hash:
+                raise ApiError(400, "В браузере отключены cookie — самооценку сохранить нельзя")
             existing = conn.execute(
                 "SELECT id FROM responses WHERE subject_id = ? AND mode = 'self'",
                 (subject["id"],),
             ).fetchone()
+            # Профиль с владельцем из другого браузера перезаписать нельзя:
+            # иначе любой мог бы «забрать» чужой псевдоним и увидеть оценки о нём.
+            if subject["owner_hash"] and not is_owner(subject, owner_hash):
+                raise ApiError(
+                    403,
+                    "Псевдоним «%s» уже занят: самооценка под ним заполнена из другого "
+                    "браузера. Выберите другой псевдоним." % subject["name"],
+                )
             if existing and not overwrite:
                 raise ApiError(409, "У этого профиля уже есть самооценка")
             if existing:
                 conn.execute("DELETE FROM responses WHERE id = ?", (existing["id"],))
+            conn.execute(
+                "UPDATE subjects SET owner_hash = ? WHERE id = ?",
+                (owner_hash, subject["id"]),
+            )
         cur = conn.execute(
             """
             INSERT INTO responses(subject_id, author_id, mode, rater, answers,
@@ -335,12 +427,17 @@ def save_response(conn, payload):
         )
         response_id = cur.lastrowid
 
+    # Полный профиль (с чужими ответами) — только владельцу, то есть автору
+    # самооценки. Оценившему другого человека возвращаются одни счётчики.
+    summary = subject_summary(conn, subject)
+    if mode == "self":
+        summary.update(build_profile(conn, subject))
     return {
         "ok": True,
         "id": response_id,
         "author_id": author["id"],
         "subject_id": subject["id"],
-        "subject": build_profile(conn, subject),
+        "subject": summary,
     }
 
 
@@ -417,10 +514,10 @@ def verify_admin_session(token):
     return email
 
 
-def admin_cookie_header(value, max_age, secure):
+def cookie_header(name, value, max_age, secure):
     path = os.environ.get("OPROS_PUBLIC_PREFIX", "").strip() or "/"
     parts = [
-        f'{ADMIN_COOKIE}="{value}"',
+        f'{name}="{value}"',
         f"Path={path}",
         "HttpOnly",
         "SameSite=Lax",
@@ -429,6 +526,10 @@ def admin_cookie_header(value, max_age, secure):
     if secure:
         parts.append("Secure")
     return "; ".join(parts)
+
+
+def admin_cookie_header(value, max_age, secure):
+    return cookie_header(ADMIN_COOKIE, value, max_age, secure)
 
 
 def iso_utc(ms):
@@ -515,6 +616,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self._send_pending_cookies()
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
@@ -527,9 +629,38 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         for key, value in extra_headers or []:
             self.send_header(key, value)
+        self._send_pending_cookies()
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(body)
+
+    def _send_pending_cookies(self):
+        for cookie in getattr(self, "_pending_cookies", ()):
+            self.send_header("Set-Cookie", cookie)
+        self._pending_cookies = []
+
+    # --- идентификация посетителя по cookie браузера ---------------------
+
+    def _visitor_token(self):
+        """Токен браузера. Если cookie ещё нет — выдаём новую вместе с ответом."""
+        cached = getattr(self, "_visitor_cache", None)
+        if cached:
+            return cached
+        token = self._cookies().get(VISITOR_COOKIE, "")
+        if not (token and 20 <= len(token) <= 128
+                and all(c.isalnum() or c in "-_" for c in token)):
+            token = new_visitor_token()
+            self._pending_cookies = getattr(self, "_pending_cookies", []) + [
+                cookie_header(VISITOR_COOKIE, token, VISITOR_COOKIE_MAX_AGE, self._secure_cookie())
+            ]
+        self._visitor_cache = token
+        return token
+
+    def _owner_hash(self):
+        return visitor_hash(self._visitor_token())
+
+    def _can_view(self, subject):
+        return is_owner(subject, self._owner_hash()) or bool(self._admin_email())
 
     def _cookies(self):
         found = {}
@@ -588,6 +719,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _dispatch(self, method):
         path = urlparse(self.path).path
+        # Одно соединение keep-alive обслуживает несколько запросов подряд.
+        self._visitor_cache = None
+        self._pending_cookies = []
         try:
             handler = getattr(self, f"_handle_{method}")
             if not handler(path):
@@ -602,6 +736,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _handle_GET(self, path):
         if path in ("/", "/index.html", "/admin", "/admin/"):
+            self._visitor_token()  # выдать cookie при первом заходе
             self._send_file("index.html", "text/html; charset=utf-8")
             return True
         if path == "/api/admin/me":
@@ -630,8 +765,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"ok": True, "db": DB_PATH})
             return True
         if path == "/api/subjects":
+            owner_hash = self._owner_hash()
             with connect() as conn:
-                self._send_json({"subjects": list_subjects(conn)})
+                self._send_json({
+                    "subjects": list_subjects(conn, owner_hash),
+                    "names": list_names(conn),
+                })
             return True
         name = self._subject_name_from_path(path)
         if name is not None:
@@ -639,6 +778,12 @@ class Handler(BaseHTTPRequestHandler):
                 subject = find_subject(conn, name)
                 if not subject:
                     raise ApiError(404, "Профиль не найден")
+                if not self._can_view(subject):
+                    raise ApiError(
+                        403,
+                        "Профиль виден только тому, кто заполнил «Я о себе» "
+                        "под этим псевдонимом, и только из его браузера",
+                    )
                 self._send_json(build_profile(conn, subject))
             return True
         return False
@@ -668,14 +813,16 @@ class Handler(BaseHTTPRequestHandler):
             return True
         if path == "/api/responses":
             payload = self._read_json()
+            owner_hash = self._owner_hash()
             with connect() as conn:
-                result = save_response(conn, payload)
+                result = save_response(conn, payload, owner_hash)
             self._send_json(result, 201)
             return True
         return False
 
     def _handle_DELETE(self, path):
         if path == "/api/subjects":
+            self._require_admin()
             with connect() as conn, conn:
                 conn.execute("DELETE FROM responses")
                 conn.execute("DELETE FROM subjects")
@@ -687,6 +834,8 @@ class Handler(BaseHTTPRequestHandler):
                 subject = find_subject(conn, name)
                 if not subject:
                     raise ApiError(404, "Профиль не найден")
+                if not self._can_view(subject):
+                    raise ApiError(403, "Удалить профиль может только его владелец")
                 # Ответы этого человека о других остаются, но без ссылки на удалённый id.
                 conn.execute(
                     "UPDATE responses SET author_id = NULL WHERE author_id = ? AND subject_id != ?",
