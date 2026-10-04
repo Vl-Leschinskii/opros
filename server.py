@@ -41,6 +41,10 @@ POST   /api/responses              — сохранить результат о�
 DELETE /api/subjects/<имя>         — удалить профиль со всеми оценками
                                      (только владелец или админ)
 DELETE /api/subjects               — удалить все профили (только админ)
+GET    /api/links                  — мои связи (владелец — этот браузер)
+GET    /api/links/<id>             — одна связь (только владелец или админ)
+POST   /api/links                  — сохранить опросник связи (36 ответов)
+DELETE /api/links/<id>             — удалить связь (только владелец или админ)
 POST   /api/admin/login            — вход в админку {email, password}
 POST   /api/admin/logout           — выход
 GET    /api/admin/me               — текущая сессия
@@ -55,6 +59,7 @@ import hashlib
 import hmac
 import io
 import json
+import math
 import os
 import secrets
 import sqlite3
@@ -75,6 +80,10 @@ MY_VECTORS = {"mysh", "kozh", "or", "zr"}   # Im — взаимодействи�
 QUESTIONS_PER_VECTOR = 5
 N_QUESTIONS = len(VECTOR_IDS) * QUESTIONS_PER_VECTOR  # 40
 MAX_NAME_LEN = 40
+
+# Опросник связей: 3 канала × 3 канала × 2 направления × (сила, фаза).
+LINK_CHANNELS = ["emotion", "resource", "goal"]
+LINK_N = len(LINK_CHANNELS) ** 2 * 2 * 2  # 36
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
@@ -113,6 +122,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS responses_one_self
 
 CREATE INDEX IF NOT EXISTS responses_subject
     ON responses(subject_id, created_at);
+
+-- Опросник связей: одна запись — оценка пары из одного браузера.
+-- Ответы: 36 чисел 0..4. Матрицы — JSON 3×3 комплексных клеток.
+CREATE TABLE IF NOT EXISTS link_responses (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_hash    TEXT    NOT NULL,
+    context       TEXT    NOT NULL CHECK (context IN ('family', 'work')),
+    self_name     TEXT    NOT NULL,
+    self_norm     TEXT    NOT NULL,
+    partner_name  TEXT    NOT NULL,
+    partner_norm  TEXT    NOT NULL,
+    answers       TEXT    NOT NULL,
+    matrix_out    TEXT    NOT NULL,
+    matrix_in     TEXT    NOT NULL,
+    radius        REAL    NOT NULL,
+    created_at    INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS link_one_pair
+    ON link_responses(owner_hash, context, self_norm, partner_norm);
 """
 
 # author_id (responses) и owner_hash (subjects) добавляются миграциями:
@@ -442,6 +471,253 @@ def save_response(conn, payload, owner_hash):
 
 
 # ----------------------------------------------------------------------------
+# Опросник связей: комплексные элементы блока A (я → он и он → я)
+# ----------------------------------------------------------------------------
+
+def _link_cell(strength, phase):
+    """Сила 0 или фаза «не читается» (2) дают ноль. Иначе A = |A|·e^{i arg}."""
+    if strength == 0 or phase == 2:
+        return 0j
+    if phase == 0:
+        return complex(strength, 0)
+    if phase == 1:
+        return complex(0, strength)
+    if phase == 3:
+        return complex(0, -strength)
+    if phase == 4:
+        return complex(-strength, 0)
+    raise ApiError(400, "Фаза должна быть целым числом от 0 до 4")
+
+
+def _matrix_from_half(answers, direction):
+    """direction 0 — я → он, 1 — он → я. В половине 9 клеток по паре (сила, фаза)."""
+    base = direction * 18
+    matrix = []
+    for row in range(3):
+        line = []
+        for col in range(3):
+            i = base + (row * 3 + col) * 2
+            line.append(_link_cell(answers[i], answers[i + 1]))
+        matrix.append(line)
+    return matrix
+
+
+def _matmul(a, b):
+    out = [[0j, 0j, 0j] for _ in range(3)]
+    for i in range(3):
+        for j in range(3):
+            out[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j]
+    return out
+
+
+def _scale(matrix, factor):
+    return [[cell * factor for cell in row] for row in matrix]
+
+
+def spectral_radius(matrix):
+    """Оценка спектрального радиуса степенным методом, 48 шагов, старт (1, 1, 1)."""
+    v = [1 + 0j, 1 + 0j, 1 + 0j]
+    norm = 0.0
+    for _ in range(48):
+        w = [
+            matrix[i][0] * v[0] + matrix[i][1] * v[1] + matrix[i][2] * v[2]
+            for i in range(3)
+        ]
+        norm = math.sqrt(sum(abs(x) ** 2 for x in w))
+        if norm < 1e-15:
+            return 0.0
+        v = [x / norm for x in w]
+    return norm
+
+
+def _cell_json(value):
+    return {"re": round(value.real, 4), "im": round(value.imag, 4)}
+
+
+def _matrix_json(matrix):
+    return [[_cell_json(cell) for cell in row] for row in matrix]
+
+
+def loudest_cell(matrix_out, matrix_in):
+    best = None
+    for direction, matrix in (("out", matrix_out), ("in", matrix_in)):
+        for row in range(3):
+            for col in range(3):
+                cell = matrix[row][col]
+                amp = abs(cell)
+                if best is None or amp > best["amp"]:
+                    arg = None if amp < 1e-9 else round(math.degrees(math.atan2(cell.imag, cell.real)))
+                    best = {
+                        "direction": direction,
+                        "row": row,
+                        "col": col,
+                        "channel_from": LINK_CHANNELS[row],
+                        "channel_to": LINK_CHANNELS[col],
+                        "re": round(cell.real, 4),
+                        "im": round(cell.imag, 4),
+                        "amp": round(amp, 4),
+                        "arg_deg": arg,
+                    }
+    return best
+
+
+def matrices_from_answers(answers):
+    matrix_out = _matrix_from_half(answers, 0)
+    matrix_in = _matrix_from_half(answers, 1)
+    # Середина шкалы |A| = 2 принята за единицу цикла.
+    product = _matmul(_scale(matrix_out, 0.5), _scale(matrix_in, 0.5))
+    radius = round(spectral_radius(product), 4)
+    return matrix_out, matrix_in, radius
+
+
+def validate_link_answers(raw):
+    if not isinstance(raw, list) or len(raw) != LINK_N:
+        raise ApiError(400, f"Ожидается {LINK_N} ответов")
+    answers = []
+    for a in raw:
+        if isinstance(a, bool) or not isinstance(a, int) or not 0 <= a <= 4:
+            raise ApiError(400, "Каждый ответ должен быть целым числом от 0 до 4")
+        answers.append(a)
+    return answers
+
+
+def link_to_dict(row, with_answers=True):
+    matrix_out = json.loads(row["matrix_out"])
+    matrix_in = json.loads(row["matrix_in"])
+    item = {
+        "id": row["id"],
+        "context": row["context"],
+        "self_name": row["self_name"],
+        "partner_name": row["partner_name"],
+        "radius": row["radius"],
+        "created_at": row["created_at"],
+        "matrix_out": matrix_out,
+        "matrix_in": matrix_in,
+    }
+    if with_answers:
+        item["answers"] = json.loads(row["answers"])
+    return item
+
+
+def list_links(conn, owner_hash):
+    if not owner_hash:
+        return []
+    rows = conn.execute(
+        """
+        SELECT * FROM link_responses
+         WHERE owner_hash = ?
+         ORDER BY created_at DESC, id DESC
+        """,
+        (owner_hash,),
+    ).fetchall()
+    return [link_to_dict(row, with_answers=False) for row in rows]
+
+
+def find_link(conn, link_id):
+    return conn.execute(
+        "SELECT * FROM link_responses WHERE id = ?", (link_id,)
+    ).fetchone()
+
+
+def can_view_link(row, owner_hash, is_admin):
+    return bool(is_admin) or (owner_hash and row["owner_hash"] == owner_hash)
+
+
+def save_link(conn, payload, owner_hash):
+    if not owner_hash:
+        raise ApiError(400, "В браузере отключены cookie — связь сохранить нельзя")
+    context = payload.get("context")
+    if context not in ("family", "work"):
+        raise ApiError(400, "Поле «context» должно быть 'family' или 'work'")
+    self_name = validate_name(payload.get("self"), "ваш псевдоним")
+    partner_name = validate_name(payload.get("partner"), "псевдоним другого человека")
+    if normalize_name(self_name) == normalize_name(partner_name):
+        raise ApiError(400, "Псевдонимы должны различаться: связь с самим собой не оценивается")
+    answers = validate_link_answers(payload.get("answers"))
+    overwrite = bool(payload.get("overwrite"))
+    matrix_out, matrix_in, radius = matrices_from_answers(answers)
+    self_norm = normalize_name(self_name)
+    partner_norm = normalize_name(partner_name)
+    with conn:
+        existing = conn.execute(
+            """
+            SELECT id FROM link_responses
+             WHERE owner_hash = ? AND context = ? AND self_norm = ? AND partner_norm = ?
+            """,
+            (owner_hash, context, self_norm, partner_norm),
+        ).fetchone()
+        if existing and not overwrite:
+            raise ApiError(409, "Эта связь уже сохранена из этого браузера")
+        if existing:
+            conn.execute("DELETE FROM link_responses WHERE id = ?", (existing["id"],))
+        cur = conn.execute(
+            """
+            INSERT INTO link_responses(
+                owner_hash, context, self_name, self_norm, partner_name, partner_norm,
+                answers, matrix_out, matrix_in, radius, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                owner_hash, context, self_name, self_norm, partner_name, partner_norm,
+                json.dumps(answers),
+                json.dumps(_matrix_json(matrix_out), ensure_ascii=False),
+                json.dumps(_matrix_json(matrix_in), ensure_ascii=False),
+                radius, now_ms(),
+            ),
+        )
+        link_id = cur.lastrowid
+    row = find_link(conn, link_id)
+    return {"ok": True, "id": link_id, "link": link_to_dict(row)}
+
+
+def load_admin_links(conn):
+    rows = conn.execute(
+        "SELECT * FROM link_responses ORDER BY created_at DESC, id DESC"
+    ).fetchall()
+    return [link_to_dict(row) for row in rows]
+
+
+LINK_CSV_COLUMNS = (
+    ["link_id", "created_at", "context", "self_name", "partner_name", "radius"]
+    + [
+        f"{direction}_{LINK_CHANNELS[row][:1]}{LINK_CHANNELS[col][:1]}_{part}"
+        for direction in ("out", "in")
+        for row in range(3)
+        for col in range(3)
+        for part in ("re", "im")
+    ]
+    + [f"q{n:02d}" for n in range(1, LINK_N + 1)]
+)
+
+
+def links_to_csv(rows):
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=LINK_CSV_COLUMNS, lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        item = {
+            "link_id": row["id"],
+            "created_at": iso_utc(row["created_at"]),
+            "context": row["context"],
+            "self_name": row["self_name"],
+            "partner_name": row["partner_name"],
+            "radius": row["radius"],
+        }
+        for direction, key in (("out", "matrix_out"), ("in", "matrix_in")):
+            matrix = row[key]
+            for r in range(3):
+                for c in range(3):
+                    prefix = f"{direction}_{LINK_CHANNELS[r][:1]}{LINK_CHANNELS[c][:1]}"
+                    item[prefix + "_re"] = matrix[r][c]["re"]
+                    item[prefix + "_im"] = matrix[r][c]["im"]
+        answers = row.get("answers") or []
+        for n in range(LINK_N):
+            item[f"q{n + 1:02d}"] = answers[n] if n < len(answers) else ""
+        writer.writerow(item)
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+
+# ----------------------------------------------------------------------------
 # Админка: почта из списка + пароль ADMIN_TOKEN, сессия в подписанной cookie
 # ----------------------------------------------------------------------------
 
@@ -708,6 +984,15 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, "Ожидается JSON-объект")
         return data
 
+    def _link_id_from_path(self, path):
+        prefix = "/api/links/"
+        if not path.startswith(prefix):
+            return None
+        raw = path[len(prefix):].strip("/")
+        if not raw.isdigit():
+            raise ApiError(400, "Некорректный id связи")
+        return int(raw)
+
     def _subject_name_from_path(self, path):
         prefix = "/api/subjects/"
         if not path.startswith(prefix):
@@ -739,6 +1024,10 @@ class Handler(BaseHTTPRequestHandler):
             self._visitor_token()  # выдать cookie при первом заходе
             self._send_file("index.html", "text/html; charset=utf-8")
             return True
+        if path in ("/links", "/links/"):
+            self._visitor_token()
+            self._send_file("links.html", "text/html; charset=utf-8")
+            return True
         if path == "/api/admin/me":
             email = self._require_admin()
             self._send_json({"email": email})
@@ -746,7 +1035,44 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/admin/data":
             self._require_admin()
             with connect() as conn:
-                self._send_json({"rows": load_admin_rows(conn)})
+                self._send_json({
+                    "rows": load_admin_rows(conn),
+                    "links": load_admin_links(conn),
+                })
+            return True
+        if path == "/api/admin/export-links.csv":
+            self._require_admin()
+            with connect() as conn:
+                body = links_to_csv(load_admin_links(conn))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header(
+                "Content-Disposition", 'attachment; filename="opros-links.csv"'
+            )
+            self.send_header("Cache-Control", "no-store")
+            self._send_pending_cookies()
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            return True
+        if path == "/api/links":
+            owner_hash = self._owner_hash()
+            with connect() as conn:
+                self._send_json({"links": list_links(conn, owner_hash)})
+            return True
+        link_id = self._link_id_from_path(path)
+        if link_id is not None and self.command in ("GET", "HEAD"):
+            with connect() as conn:
+                row = find_link(conn, link_id)
+                if not row:
+                    raise ApiError(404, "Связь не найдена")
+                if not can_view_link(row, self._owner_hash(), self._admin_email()):
+                    raise ApiError(
+                        403,
+                        "Эту связь видит только тот, кто её заполнил, и только из своего браузера",
+                    )
+                self._send_json(link_to_dict(row))
             return True
         if path == "/api/admin/export.csv":
             self._require_admin()
@@ -818,6 +1144,13 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_response(conn, payload, owner_hash)
             self._send_json(result, 201)
             return True
+        if path == "/api/links":
+            payload = self._read_json()
+            owner_hash = self._owner_hash()
+            with connect() as conn:
+                result = save_link(conn, payload, owner_hash)
+            self._send_json(result, 201)
+            return True
         return False
 
     def _handle_DELETE(self, path):
@@ -842,6 +1175,17 @@ class Handler(BaseHTTPRequestHandler):
                     (subject["id"], subject["id"]),
                 )
                 conn.execute("DELETE FROM subjects WHERE id = ?", (subject["id"],))
+            self._send_json({"ok": True})
+            return True
+        link_id = self._link_id_from_path(path)
+        if link_id is not None:
+            with connect() as conn, conn:
+                row = find_link(conn, link_id)
+                if not row:
+                    raise ApiError(404, "Связь не найдена")
+                if not can_view_link(row, self._owner_hash(), self._admin_email()):
+                    raise ApiError(403, "Удалить связь может только тот, кто её заполнил")
+                conn.execute("DELETE FROM link_responses WHERE id = ?", (link_id,))
             self._send_json({"ok": True})
             return True
         return False

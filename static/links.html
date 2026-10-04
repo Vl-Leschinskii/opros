@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Связь — опросник матрицы общения</title>
+<style>
+  :root{
+    --bg:#f7f4ee; --card:#ffffff; --ink:#241f38; --muted:#7a7290;
+    --gold:#b8912f; --gold-soft:#e8d9a8; --gold-bg:#fbf6e8;
+    --purple:#6b4c9a; --purple-soft:#e2d9f0; --purple-bg:#f4f0fa;
+    --line:#e7e1d4; --shadow:0 2px 24px rgba(36,31,56,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.6;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(107,76,154,.05), transparent 45%),
+      radial-gradient(circle at 85% 90%, rgba(184,145,47,.06), transparent 45%);
+    background-attachment:fixed;
+  }
+  .app{max-width:760px;margin:0 auto;padding:32px 20px 80px;}
+  header.top{text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--line);}
+  header.top .brand{font-family:Georgia,serif;font-size:13px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;}
+  header.top h1{font-family:Georgia,serif;font-size:26px;font-weight:400;line-height:1.3;}
+  header.top h1 .amp{color:var(--gold);font-style:italic}
+  .main-nav{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px;}
+  .nav-btn{padding:9px 22px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;font-family:inherit;text-decoration:none;}
+  .nav-btn:hover{border-color:var(--gold);color:var(--gold);}
+  .nav-btn.active{background:var(--gold-bg);border-color:var(--gold);color:var(--gold);}
+  section{display:none;animation:fade .45s ease both}
+  section.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;font-size:15px;font-weight:600;padding:14px 30px;border-radius:11px;border:none;cursor:pointer;background:linear-gradient(135deg,#7a58ab,#5a3d85);color:#fff;box-shadow:0 6px 18px rgba(90,61,133,.28);text-decoration:none;}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.ghost{background:transparent;color:var(--muted);box-shadow:none;border:1px solid var(--line);font-weight:500;}
+  .btn.ghost:hover{background:#fff;color:var(--ink)}
+  .btn.small{padding:8px 16px;font-size:13px;}
+  .btn.danger{background:transparent;color:#a8433a;border:1px solid #e3b8b3;}
+  .intro-card,.profiles-card,.q-card,.res-hero,.panel,.setup-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);}
+  .intro-card,.profiles-card{padding:32px 28px;}
+  .setup-card{padding:32px 28px;max-width:520px;margin:0 auto;}
+  .formula{text-align:center;font-family:Georgia,serif;font-size:26px;margin:14px 0 6px;}
+  .formula .re{color:var(--gold)} .formula .im{color:var(--purple)}
+  .formula-sub{text-align:center;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:22px;}
+  .intro-lead{color:#4a4460;margin-bottom:18px;font-size:15px;text-align:center;}
+  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0 22px;}
+  @media(max-width:560px){.mode-grid{grid-template-columns:1fr}}
+  .mode-card{text-align:left;background:#fdfcf9;border:1px solid var(--line);border-radius:14px;padding:22px 20px;cursor:pointer;font-family:inherit;color:var(--ink);}
+  .mode-card:hover{border-color:var(--gold);background:var(--gold-bg);transform:translateY(-2px);}
+  .mode-card.purple:hover{border-color:var(--purple);background:var(--purple-bg);}
+  .mode-card .mc-icon{font-family:Georgia,serif;font-size:26px;color:var(--gold);display:block;margin-bottom:8px;}
+  .mode-card.purple .mc-icon{color:var(--purple)}
+  .mode-card .mc-title{font-family:Georgia,serif;font-size:19px;margin-bottom:8px;}
+  .mode-card .mc-desc{font-size:13.5px;line-height:1.45;color:#5a5470;}
+  .intro-links{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+  .scale-note{background:#fbfaf6;border-left:3px solid var(--gold);padding:14px 18px;font-size:13.5px;color:#5a5470;border-radius:0 10px 10px 0;margin-top:22px;}
+  .scale-note ul{margin:6px 0 0 18px;}
+  .citation{margin-top:18px;padding:14px 18px;background:#fdfcf9;border:1px solid var(--line);border-radius:0 10px 10px 0;border-left:3px solid var(--purple);font-size:13px;color:#4a4460;font-family:Georgia,serif;}
+  .citation .cit-author{color:var(--purple);font-weight:700;font-size:12px;}
+  .setup-step{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
+  .setup-card h2,.profiles-card h2{font-family:Georgia,serif;font-size:24px;font-weight:400;margin-bottom:10px;}
+  .setup-desc,.profiles-desc{font-size:14px;color:#5a5470;margin-bottom:18px;}
+  .field-label{display:block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:14px 0 7px;}
+  .field-input{width:100%;padding:13px 16px;font-family:inherit;font-size:15px;color:var(--ink);background:#fdfcf9;border:1px solid var(--line);border-radius:10px;outline:none;}
+  .field-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,145,47,.15);background:#fff;}
+  .setup-actions,.res-actions{display:flex;justify-content:space-between;gap:10px;margin-top:28px;flex-wrap:wrap;}
+  .quiz-head{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+  .progress-track{height:4px;background:#eae4d8;border-radius:99px;overflow:hidden;margin-bottom:22px;}
+  .progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--purple));transition:width .4s ease;}
+  .quiz-mode-badge{display:inline-block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-soft);padding:5px 12px;border-radius:99px;margin-bottom:14px;font-weight:700;}
+  .quiz-mode-badge.in{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-soft);}
+  .q-card{padding:30px 28px;}
+  .q-card.anim{animation:slidein .35s ease both}
+  @keyframes slidein{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+  .q-num{font-family:Georgia,serif;font-size:13px;letter-spacing:.16em;color:var(--gold);margin-bottom:12px;}
+  .q-text{font-family:Georgia,serif;font-size:21px;line-height:1.45;margin-bottom:26px;min-height:62px;}
+  .options{display:flex;flex-direction:column;gap:9px}
+  .opt{display:flex;align-items:center;gap:14px;padding:13px 18px;border:1px solid var(--line);border-radius:11px;background:#fdfcf9;cursor:pointer;font-size:15px;text-align:left;font-family:inherit;color:var(--ink);width:100%;}
+  .opt:hover{border-color:var(--gold-soft);background:var(--gold-bg)}
+  .opt .num{flex:0 0 30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#efeade;font-family:Georgia,serif;color:var(--muted);}
+  .opt.selected{border-color:var(--gold);background:var(--gold-bg);box-shadow:0 0 0 3px rgba(184,145,47,.14);}
+  .opt.selected .num{background:var(--gold);color:#fff}
+  .q-nav{display:flex;justify-content:space-between;margin-top:24px}
+  .res-hero{padding:30px 28px;text-align:center;margin-bottom:20px;}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+  .panel{padding:22px;margin-bottom:20px;}
+  .panel h3{font-family:Georgia,serif;font-size:15px;font-weight:400;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+  .verdict{margin-top:14px;padding:12px 16px;border-radius:10px;font-size:14px;line-height:1.5;background:#fbfaf6;border-left:3px solid var(--gold);}
+  .matrix{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .matrix th,.matrix td{border:1px solid var(--line);padding:8px 10px;text-align:center;vertical-align:middle;}
+  .matrix th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:#fbfaf6;font-weight:700;}
+  .matrix td{font-family:Georgia,serif;color:var(--ink);background:#fdfcf9;}
+  .matrix .zero{color:#a09aae;}
+  .matrix .ang{display:block;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:11px;color:var(--purple);margin-top:2px;}
+  .save-panel{background:#fbfaf6;border:1px dashed var(--gold-soft);border-radius:14px;padding:20px 22px;margin-bottom:20px;}
+  .save-panel .sp-label{font-family:Georgia,serif;font-size:15px;margin-bottom:8px;color:#6b5210;}
+  .save-panel .sp-hint{font-size:14px;color:#5a5470;}
+  .profile-item{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:#fdfcf9;cursor:pointer;margin-bottom:10px;}
+  .profile-item:hover{border-color:var(--gold);background:var(--gold-bg)}
+  .pi-name{font-family:Georgia,serif;font-size:17px;}
+  .pi-meta{font-size:12.5px;color:var(--muted);}
+  .badge{display:inline-block;padding:2px 9px;border-radius:99px;background:#efeade;margin-right:6px;font-size:11.5px;color:#6b5210;}
+  .empty-state{text-align:center;padding:36px 16px;color:#a09aae;}
+  .foot-note{margin-top:28px;font-size:12.5px;color:#a09aae;text-align:center;line-height:1.55;}
+  .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:12px 24px;border-radius:99px;font-size:14px;opacity:0;transition:all .3s ease;pointer-events:none;z-index:99;}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">Матрица связи</div>
+    <h1>Общение <span class="amp">/</span> комплексные элементы</h1>
+    <nav class="main-nav">
+      <a class="nav-btn" id="navHome" href="/">Личность</a>
+      <button class="nav-btn active" id="navLinks" type="button" onclick="show('intro')">Связь</button>
+      <button class="nav-btn" id="navMine" type="button" onclick="showLinks()">Мои связи <span id="linkCount"></span></button>
+    </nav>
+  </header>
+
+  <section id="intro" class="active">
+    <div class="intro-card">
+      <div class="formula"><span class="re">A</span> = |A| · <span class="im">e<sup>iφ</sup></span></div>
+      <div class="formula-sub">сила сигнала · фаза отклика</div>
+      <p class="intro-lead">Оцените общение с одним человеком — в семье или на работе. Из ответов собираются комплексные элементы матрицы связи в обе стороны.</p>
+      <div class="mode-grid">
+        <button class="mode-card" type="button" onclick="chooseContext('family')">
+          <span class="mc-icon">⌂</span>
+          <div class="mc-title">В семье</div>
+          <div class="mc-desc">Чувства, силы и время дома, решения о том, куда вести семью.</div>
+        </button>
+        <button class="mode-card purple" type="button" onclick="chooseContext('work')">
+          <span class="mc-icon">▣</span>
+          <div class="mc-title">На работе</div>
+          <div class="mc-desc">Отношение к делу, запас сил на задачи, решения о том, куда вести работу.</div>
+        </button>
+      </div>
+      <div class="intro-links">
+        <button class="btn ghost small" type="button" onclick="showLinks()">Мои связи <span id="linkCount2"></span></button>
+      </div>
+      <div class="scale-note">
+        <b>Три канала.</b> Эмоция, ресурс и цель. На каждую пару каналов два вопроса: насколько сильно один сдвигает другой и с какой фазой — сразу или с задержкой, в ту же сторону или в противоположную.
+        <ul>
+          <li>Влияние направлено: «я → он» и «он → я» спрашиваются отдельно.</li>
+          <li>Связь с самим собой не оценивается.</li>
+          <li>Результат виден только в том браузере, откуда анкета отправлена.</li>
+        </ul>
+      </div>
+      <div class="citation">
+        <span class="cit-author">В. Лещинский</span><br>
+        Оценка по модели «Динамика открытых систем на ориентированных графах»: амплитуда и фаза канала влияния. Это не измеренный спектр коллектива.
+      </div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="setup-card">
+      <div class="setup-step" id="setupStep">Семья</div>
+      <h2>Кто с кем</h2>
+      <p class="setup-desc">Оба псевдонима обязательны. Одинаковая пара в том же контексте из этого браузера перезаписывается только после подтверждения.</p>
+      <label class="field-label" for="selfName">Ваш псевдоним</label>
+      <input id="selfName" class="field-input" maxlength="40" autocomplete="off" placeholder="Например: Анна">
+      <label class="field-label" for="partnerName">Псевдоним другого человека</label>
+      <input id="partnerName" class="field-input" maxlength="40" autocomplete="off" placeholder="Например: Иван">
+      <div class="setup-actions">
+        <button class="btn ghost" type="button" onclick="show('intro')">← Назад</button>
+        <button class="btn" type="button" onclick="confirmPair()">Начать →</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="quiz">
+    <div class="quiz-head">
+      <span>Вопрос <span id="qNow">1</span> из 36</span>
+      <span id="qPct">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div id="quizBadge" class="quiz-mode-badge">я → он · сила</div>
+    <div class="q-card" id="qCard">
+      <div class="q-num" id="qNum">01 / 36</div>
+      <div class="q-text" id="qText">…</div>
+      <div class="options" id="qOptions"></div>
+    </div>
+    <div class="q-nav">
+      <button class="btn ghost" id="backBtn" type="button" onclick="prevQuestion()">← Назад</button>
+      <button class="btn ghost" type="button" onclick="abortQuiz()">Прервать</button>
+    </div>
+  </section>
+
+  <section id="results">
+    <div class="res-hero">
+      <div class="eyebrow" id="resEyebrow">Оценка матрицы связи</div>
+      <div class="formula" id="resTitle" style="margin-top:0"></div>
+      <p class="intro-lead" id="resNote" style="margin:8px 0 0">Оценка по модели, не измеренный спектр коллектива.</p>
+    </div>
+    <div class="save-panel" id="savePanel"></div>
+    <div id="resBody"></div>
+    <div class="res-actions">
+      <button class="btn ghost" type="button" onclick="showLinks()">← Мои связи</button>
+      <button class="btn ghost" type="button" onclick="show('intro')">Новая связь</button>
+      <button class="btn danger" id="deleteBtn" type="button" onclick="deleteCurrent()">Удалить</button>
+    </div>
+    <div class="foot-note">Модель: «Динамика открытых систем на ориентированных графах», В. Лещинский. Амплитуда — сила сигнала, фаза — ритм отклика. Середина шкалы |A| = 2 принята за единицу 2-цикла.</div>
+  </section>
+
+  <section id="list">
+    <div class="profiles-card">
+      <h2>Мои связи</h2>
+      <p class="profiles-desc">Только анкеты, отправленные из этого браузера. Чужие связи здесь не появляются.</p>
+      <div id="linksList"></div>
+      <div class="res-actions" style="justify-content:flex-start">
+        <button class="btn ghost" type="button" onclick="show('intro')">← Назад</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const BASE = (location.pathname === '/opros' || location.pathname.startsWith('/opros/')) ? '/opros' : '';
+document.getElementById('navHome').href = (BASE || '') + '/';
+
+const CH = [
+  {
+    short:'эмоция',
+    family:{
+      outSrc:'я говорю о своих чувствах',
+      inSrc:'он(а) говорит о своих чувствах',
+      outDst:'его(её) настроение',
+      inDst:'моё настроение'
+    },
+    work:{
+      outSrc:'я показываю своё отношение к делу',
+      inSrc:'он(а) показывает своё отношение к делу',
+      outDst:'его(её) настрой к работе',
+      inDst:'мой настрой к работе'
+    }
+  },
+  {
+    short:'ресурс',
+    family:{
+      outSrc:'у меня не хватает сил или времени на дом',
+      inSrc:'у него(неё) не хватает сил или времени на дом',
+      outDst:'его(её) запас сил и времени',
+      inDst:'мой запас сил и времени'
+    },
+    work:{
+      outSrc:'у меня не хватает сил или времени на задачи',
+      inSrc:'у него(неё) не хватает сил или времени на задачи',
+      outDst:'его(её) запас сил и времени на работу',
+      inDst:'мой запас сил и времени на работу'
+    }
+  },
+  {
+    short:'цель',
+    family:{
+      outSrc:'я меняю решение о том, чего хочу для семьи',
+      inSrc:'он(а) меняет решение о том, чего хочет для семьи',
+      outDst:'то, к чему он(а) ведёт семью',
+      inDst:'то, к чему я веду семью'
+    },
+    work:{
+      outSrc:'я меняю решение о том, куда вести работу',
+      inSrc:'он(а) меняет решение о том, куда вести работу',
+      outDst:'то, к чему он(а) ведёт работу',
+      inDst:'то, к чему я веду работу'
+    }
+  }
+];
+const STRENGTH = ['никак','едва','отчасти','заметно','очень сильно'];
+const PHASE = [
+  'сразу и в ту же сторону',
+  'в ту же сторону, но с задержкой',
+  'ритм почти не читается',
+  'в противоположную сторону, с задержкой',
+  'сразу в противоположную сторону'
+];
+const N = 36;
+
+let context = 'family';
+let selfName = '';
+let partnerName = '';
+let answers = new Array(N).fill(null);
+let current = 0;
+let locked = false;
+let currentId = null;
+let lastSave = {state:'idle', error:null};
+
+function questions(){
+  const pack = context === 'work' ? 'work' : 'family';
+  const list = [];
+  ['out','in'].forEach(direction => {
+    const srcKey = direction === 'out' ? 'outSrc' : 'inSrc';
+    const dstKey = direction === 'out' ? 'outDst' : 'inDst';
+    for(let row=0; row<3; row++){
+      for(let col=0; col<3; col++){
+        const src = CH[row][pack][srcKey];
+        const dst = CH[col][pack][dstKey];
+        list.push({
+          direction, row, col, kind:'strength',
+          text:'Когда ' + src + ', насколько меняется ' + dst + '?'
+        });
+        list.push({
+          direction, row, col, kind:'phase',
+          text:'Когда ' + src + ', и от этого меняется ' + dst + ' — как именно идёт этот сдвиг?'
+        });
+      }
+    }
+  });
+  return list;
+}
+
+async function api(method, path, body){
+  let res;
+  try {
+    res = await fetch(path, {
+      method,
+      headers: body !== undefined ? {'Content-Type':'application/json'} : {},
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+  } catch(e){
+    const err = new Error('Нет связи с сервером'); err.status = 0; throw err;
+  }
+  let data = null;
+  try { data = await res.json(); } catch(e){}
+  if(!res.ok){
+    const err = new Error((data && data.error) || ('Ошибка сервера ' + res.status));
+    err.status = res.status; throw err;
+  }
+  return data;
+}
+
+function show(id){
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+  document.getElementById('navLinks').classList.toggle('active', id !== 'list');
+  document.getElementById('navMine').classList.toggle('active', id === 'list');
+  updateCount();
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function updateCount(){
+  let label = '';
+  try {
+    const data = await api('GET', BASE + '/api/links');
+    label = data.links.length ? '(' + data.links.length + ')' : '';
+  } catch(e){}
+  document.getElementById('linkCount').textContent = label;
+  document.getElementById('linkCount2').textContent = label;
+}
+
+function chooseContext(value){
+  context = value;
+  document.getElementById('setupStep').textContent = value === 'work' ? 'Работа' : 'Семья';
+  document.getElementById('selfName').value = '';
+  document.getElementById('partnerName').value = '';
+  show('setup');
+  setTimeout(() => document.getElementById('selfName').focus(), 250);
+}
+function confirmPair(){
+  const clean = value => value.trim().replace(/\s+/g, ' ');
+  const s = clean(document.getElementById('selfName').value);
+  const p = clean(document.getElementById('partnerName').value);
+  if(!s){ showToast('Введите свой псевдоним'); return; }
+  if(!p){ showToast('Введите псевдоним другого человека'); return; }
+  if(s.toLocaleLowerCase('ru') === p.toLocaleLowerCase('ru')){
+    showToast('Псевдонимы должны различаться');
+    return;
+  }
+  selfName = s;
+  partnerName = p;
+  answers = new Array(N).fill(null);
+  current = 0;
+  currentId = null;
+  lastSave = {state:'idle', error:null};
+  show('quiz');
+  renderQuestion();
+}
+function abortQuiz(){
+  if(confirm('Прервать? Ответы не сохранятся.')) show('intro');
+}
+
+const qCard = document.getElementById('qCard');
+function renderQuestion(){
+  locked = false;
+  const q = questions()[current];
+  const dir = q.direction === 'out' ? 'я → он(а)' : 'он(а) → я';
+  const kind = q.kind === 'strength' ? 'сила' : 'фаза';
+  document.getElementById('qNum').textContent = String(current+1).padStart(2,'0') + ' / ' + N + ' · ' + CH[q.row].short + ' → ' + CH[q.col].short;
+  document.getElementById('qText').textContent = q.text;
+  const badge = document.getElementById('quizBadge');
+  badge.textContent = (context === 'work' ? 'Работа' : 'Семья') + ' · ' + selfName + ' · ' + dir + ' · ' + kind;
+  badge.className = 'quiz-mode-badge' + (q.direction === 'in' ? ' in' : '');
+  const labels = q.kind === 'strength' ? STRENGTH : PHASE;
+  const box = document.getElementById('qOptions');
+  box.innerHTML = '';
+  labels.forEach((label, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opt' + (answers[current] === i ? ' selected' : '');
+    b.innerHTML = '<span class="num">' + i + '</span><span>' + label + '</span>';
+    b.onclick = () => selectOption(i);
+    box.appendChild(b);
+  });
+  document.getElementById('qNow').textContent = current + 1;
+  const pct = Math.round(current / N * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('qPct').textContent = pct + '%';
+  document.getElementById('backBtn').style.visibility = current === 0 ? 'hidden' : 'visible';
+  qCard.classList.remove('anim'); void qCard.offsetWidth; qCard.classList.add('anim');
+}
+function selectOption(i){
+  if(locked) return;
+  locked = true;
+  answers[current] = i;
+  [...document.getElementById('qOptions').children].forEach((el, idx) => el.classList.toggle('selected', idx === i));
+  setTimeout(() => {
+    if(current < N - 1){ current++; renderQuestion(); }
+    else {
+      document.getElementById('progressFill').style.width = '100%';
+      document.getElementById('qPct').textContent = '100%';
+      setTimeout(showFreshResult, 280);
+    }
+  }, 280);
+}
+function prevQuestion(){ if(current > 0){ current--; renderQuestion(); } }
+document.addEventListener('keydown', e => {
+  if(!document.getElementById('quiz').classList.contains('active')) return;
+  if(e.key >= '0' && e.key <= '4') selectOption(parseInt(e.key, 10));
+  if(e.key === 'Backspace' || e.key === 'ArrowLeft'){ e.preventDefault(); prevQuestion(); }
+});
+
+function cellOf(strength, phase){
+  if(strength === 0 || phase === 2) return {re:0, im:0};
+  if(phase === 0) return {re:strength, im:0};
+  if(phase === 1) return {re:0, im:strength};
+  if(phase === 3) return {re:0, im:-strength};
+  return {re:-strength, im:0};
+}
+function matrixOf(direction){
+  const base = direction * 18;
+  const matrix = [];
+  for(let row=0; row<3; row++){
+    const line = [];
+    for(let col=0; col<3; col++){
+      const i = base + (row * 3 + col) * 2;
+      line.push(cellOf(answers[i], answers[i+1]));
+    }
+    matrix.push(line);
+  }
+  return matrix;
+}
+function cadd(a, b){ return {re:a.re+b.re, im:a.im+b.im}; }
+function cmul(a, b){ return {re:a.re*b.re - a.im*b.im, im:a.re*b.im + a.im*b.re}; }
+function cscale(a, s){ return {re:a.re*s, im:a.im*s}; }
+function scaleMatrix(m, s){ return m.map(row => row.map(cell => cscale(cell, s))); }
+function matmul(a, b){
+  const out = [];
+  for(let i=0;i<3;i++){
+    const line = [];
+    for(let j=0;j<3;j++){
+      let acc = {re:0, im:0};
+      for(let k=0;k<3;k++) acc = cadd(acc, cmul(a[i][k], b[k][j]));
+      line.push(acc);
+    }
+    out.push(line);
+  }
+  return out;
+}
+function spectralRadius(matrix){
+  let v = [{re:1,im:0},{re:1,im:0},{re:1,im:0}];
+  let norm = 0;
+  for(let step=0; step<48; step++){
+    const w = [0,1,2].map(i => {
+      let acc = {re:0, im:0};
+      for(let j=0;j<3;j++) acc = cadd(acc, cmul(matrix[i][j], v[j]));
+      return acc;
+    });
+    norm = Math.sqrt(w.reduce((s, x) => s + x.re*x.re + x.im*x.im, 0));
+    if(norm < 1e-15) return 0;
+    v = w.map(x => cscale(x, 1/norm));
+  }
+  return Math.round(norm * 10000) / 10000;
+}
+function localModel(){
+  const matrix_out = matrixOf(0);
+  const matrix_in = matrixOf(1);
+  const radius = spectralRadius(matmul(scaleMatrix(matrix_out, 0.5), scaleMatrix(matrix_in, 0.5)));
+  return {context, self_name:selfName, partner_name:partnerName, matrix_out, matrix_in, radius};
+}
+
+function amp(cell){ return Math.hypot(cell.re, cell.im); }
+function argDeg(cell){
+  if(amp(cell) < 1e-9) return null;
+  return Math.round(Math.atan2(cell.im, cell.re) * 180 / Math.PI);
+}
+function fmt(x){
+  const n = Math.round(x * 10) / 10;
+  return Object.is(n, -0) || n === 0 ? '0' : (Number.isInteger(n) ? String(n) : n.toFixed(1));
+}
+function cellHtml(cell){
+  if(amp(cell) < 1e-9) return '<span class="zero">0</span>';
+  const sign = cell.im < 0 ? '−' : '+';
+  const deg = argDeg(cell);
+  return fmt(cell.re) + ' ' + sign + ' ' + fmt(Math.abs(cell.im)) + 'i<span class="ang">' + deg + '°</span>';
+}
+function matrixTable(matrix){
+  const head = '<tr><th></th>' + CH.map(ch => '<th>' + ch.short + '</th>').join('') + '</tr>';
+  const body = matrix.map((row, r) =>
+    '<tr><th>' + CH[r].short + '</th>' + row.map(cellHtml).map(html => '<td>' + html + '</td>').join('') + '</tr>'
+  ).join('');
+  return '<table class="matrix"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
+function diffMatrix(a, b){
+  return a.map((row, r) => row.map((cell, c) => ({re:cell.re - b[r][c].re, im:cell.im - b[r][c].im})));
+}
+function loudest(model){
+  let best = null;
+  [['out', model.matrix_out], ['in', model.matrix_in]].forEach(([direction, matrix]) => {
+    matrix.forEach((row, r) => row.forEach((cell, c) => {
+      const value = amp(cell);
+      if(!best || value > best.amp){
+        best = {direction, row:r, col:c, amp:value, arg:argDeg(cell), cell};
+      }
+    }));
+  });
+  return best;
+}
+function renderReadings(model){
+  const diff = diffMatrix(model.matrix_out, model.matrix_in);
+  let gap = null;
+  diff.forEach((row, r) => row.forEach((cell, c) => {
+    const value = amp(cell);
+    if(!gap || value > gap.amp) gap = {row:r, col:c, amp:value, cell};
+  }));
+  const who = gap && gap.amp >= 0.5
+    ? 'Сильнее всего расходятся «' + CH[gap.row].short + ' → ' + CH[gap.col].short + '»: разность ' + fmt(gap.cell.re) + (gap.cell.im < 0 ? ' − ' : ' + ') + fmt(Math.abs(gap.cell.im)) + 'i. Влияние по этому каналу течёт не одинаково в обе стороны.'
+    : 'По каналам влияние близко к взаимному: клетки двух направлений почти совпадают.';
+  const rho = model.radius;
+  const cycle = rho > 1
+    ? '2-цикл усиливается: спектральный радиус произведения ρ = ' + rho + ' больше 1.'
+    : (rho < 1
+      ? '2-цикл затухает: спектральный радиус произведения ρ = ' + rho + ' меньше 1.'
+      : '2-цикл на пороге: ρ = 1.');
+  const loud = loudest(model);
+  const dir = loud.direction === 'out' ? 'я → он(а)' : 'он(а) → я';
+  const loudText = loud.amp < 1e-9
+    ? 'Все элементы нулевые: ни один канал не сдвигается.'
+    : 'Громче всего «' + CH[loud.row].short + ' → ' + CH[loud.col].short + '», направление ' + dir + ', |A| = ' + fmt(loud.amp) + (loud.arg === null ? '' : ', φ = ' + loud.arg + '°') + '.';
+  return {who, cycle, loudText, diff};
+}
+
+function renderResult(model, opts){
+  const ctx = model.context === 'work' ? 'Работа' : 'Семья';
+  document.getElementById('resEyebrow').textContent = ctx + ' · оценка по модели';
+  document.getElementById('resTitle').innerHTML =
+    escapeHtml(model.self_name) + ' <span class="amp">→</span> ' + escapeHtml(model.partner_name);
+  document.getElementById('deleteBtn').style.display = opts && opts.canDelete ? '' : 'none';
+  const read = renderReadings(model);
+  document.getElementById('resBody').innerHTML =
+    '<div class="panel"><h3>Я → он(а)</h3><p class="profiles-desc">Строка — что меняется у меня, столбец — что сдвигается у него(неё).</p>' + matrixTable(model.matrix_out) + '</div>' +
+    '<div class="panel"><h3>Он(а) → я</h3><p class="profiles-desc">Строка — что меняется у него(неё), столбец — что сдвигается у меня.</p>' + matrixTable(model.matrix_in) + '</div>' +
+    '<div class="panel"><h3>Невзаимность</h3><p class="profiles-desc">Разность клеток: (я → он) минус (он → я).</p>' + matrixTable(read.diff) + '<div class="verdict">' + read.who + '</div></div>' +
+    '<div class="panel"><h3>2-цикл</h3><div class="verdict">' + read.cycle + ' Сравнение с 1 сделано после деления каждой амплитуды на 2 — середину шкалы.</div></div>' +
+    '<div class="panel"><h3>Какой канал громче</h3><div class="verdict">' + read.loudText + '</div></div>';
+  show('results');
+}
+
+function renderSavePanel(){
+  const panel = document.getElementById('savePanel');
+  if(lastSave.state === 'saving'){
+    panel.innerHTML = '<div class="sp-label">Сохранение…</div>';
+    return;
+  }
+  if(lastSave.state === 'error'){
+    panel.innerHTML = '<div class="sp-label">Не удалось сохранить</div><div class="sp-hint">' + escapeHtml(lastSave.error || '') + '</div><div style="margin-top:12px"><button class="btn small" type="button" onclick="submitLink(false)">Повторить</button></div>';
+    return;
+  }
+  if(lastSave.state === 'saved'){
+    panel.innerHTML = '<div class="sp-label">Связь сохранена</div><div class="sp-hint">Матрица видна только вам и только в этом браузере.</div>';
+    return;
+  }
+  if(lastSave.state === 'view'){
+    panel.innerHTML = '<div class="sp-label">Сохранённая связь</div><div class="sp-hint">Числа посчитаны при сохранении анкеты.</div>';
+    return;
+  }
+  panel.innerHTML = '';
+}
+
+function showFreshResult(){
+  lastSave = {state:'saving', error:null};
+  renderResult(localModel(), {canDelete:false});
+  renderSavePanel();
+  submitLink(false);
+}
+async function submitLink(overwrite){
+  lastSave = {state:'saving', error:null};
+  renderSavePanel();
+  try {
+    const res = await api('POST', BASE + '/api/links', {
+      context, self:selfName, partner:partnerName, answers:answers.slice(), overwrite: !!overwrite
+    });
+    currentId = res.id;
+    lastSave = {state:'saved', error:null};
+    renderResult(res.link, {canDelete:true});
+    renderSavePanel();
+    showToast('Сохранено');
+    updateCount();
+  } catch(e){
+    if(e.status === 409 && !overwrite){
+      if(confirm('Связь «' + selfName + '» и «' + partnerName + '» в этом контексте уже есть. Перезаписать?')){
+        submitLink(true);
+        return;
+      }
+      lastSave = {state:'error', error:'Связь не перезаписана'};
+    } else {
+      lastSave = {state:'error', error:e.message};
+    }
+    renderSavePanel();
+  }
+}
+
+async function showLinks(){
+  const box = document.getElementById('linksList');
+  box.innerHTML = '<div class="empty-state">Загрузка…</div>';
+  show('list');
+  let links;
+  try { links = (await api('GET', BASE + '/api/links')).links; }
+  catch(e){
+    box.innerHTML = '<div class="empty-state">' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  if(!links.length){
+    box.innerHTML = '<div class="empty-state">У вас пока нет сохранённых связей.<br>Пройдите анкету — запись появится здесь.</div>';
+    updateCount();
+    return;
+  }
+  box.innerHTML = '';
+  links.forEach(link => {
+    const item = document.createElement('div');
+    item.className = 'profile-item';
+    const ctx = link.context === 'work' ? 'работа' : 'семья';
+    item.innerHTML = '<div><div class="pi-name">' + escapeHtml(link.self_name) + ' → ' + escapeHtml(link.partner_name) + '</div><div class="pi-meta"><span class="badge">' + ctx + '</span><span class="badge">ρ ' + link.radius + '</span></div></div><div>→</div>';
+    item.onclick = () => openLink(link.id);
+    box.appendChild(item);
+  });
+  updateCount();
+}
+async function openLink(id){
+  try {
+    const link = await api('GET', BASE + '/api/links/' + id);
+    currentId = link.id;
+    selfName = link.self_name;
+    partnerName = link.partner_name;
+    context = link.context;
+    lastSave = {state:'view', error:null};
+    renderResult(link, {canDelete:true});
+    renderSavePanel();
+  } catch(e){
+    showToast(e.status === 403 ? 'Эту связь видит только тот, кто её заполнил' : e.message);
+  }
+}
+async function deleteCurrent(){
+  if(!currentId) return;
+  if(!confirm('Удалить эту связь из базы?')) return;
+  try {
+    await api('DELETE', BASE + '/api/links/' + currentId);
+    currentId = null;
+    showToast('Связь удалена');
+    showLinks();
+  } catch(e){ showToast(e.message); }
+}
+updateCount();
+</script>
+</body>
+</html>

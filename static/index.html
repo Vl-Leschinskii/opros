@@ -325,6 +325,7 @@
   .admin-table tr:last-child td{border-bottom:none;}
   .admin-error{color:#a8433a;font-size:13.5px;margin-top:12px;min-height:1.2em;}
   .admin-actions{display:flex;gap:8px;flex-wrap:wrap;}
+  .admin-block-title{font-family:Georgia,serif;font-size:15px;font-weight:400;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:22px 0 0;}
 
   .empty-state{text-align:center;padding:40px 20px;color:#a09aae;font-size:14.5px;line-height:1.6;}
   .empty-state .es-icon{font-family:Georgia,serif;font-size:40px;color:var(--line);display:block;margin-bottom:12px;}
@@ -459,6 +460,7 @@
       <div class="intro-links">
         <button class="btn ghost small" onclick="navTo('typology')">Изучить типологию</button>
         <button class="btn ghost small" onclick="showProfiles()">Мои профили <span id="profileCount2"></span></button>
+        <a class="btn ghost small" id="linksHomeLink" href="links">Опросник связей</a>
       </div>
       <div class="scale-note">
         <b>Как отвечать.</b> Оцените каждое утверждение по шкале:
@@ -753,11 +755,15 @@
         <h2>База опросов</h2>
         <div class="admin-actions">
           <a class="btn small" id="adminExport" href="#">Скачать CSV</a>
+          <a class="btn ghost small" id="adminExportLinks" href="#">Скачать связи CSV</a>
           <button class="btn ghost small" onclick="adminLogout()">Выйти</button>
         </div>
       </div>
       <p class="profiles-desc" id="adminMeta"></p>
+      <h3 class="admin-block-title">Личность</h3>
       <div class="admin-scroll" id="adminTable"></div>
+      <h3 class="admin-block-title">Связи</h3>
+      <div class="admin-scroll" id="adminLinks"></div>
     </div>
   </section>
 
@@ -2051,6 +2057,7 @@ function showAdminPanel(email){
   document.getElementById('adminLogin').style.display = 'none';
   document.getElementById('adminPanel').style.display = '';
   document.getElementById('adminExport').href = BASE + '/api/admin/export.csv';
+  document.getElementById('adminExportLinks').href = BASE + '/api/admin/export-links.csv';
   document.getElementById('adminMeta').textContent = 'Сессия: ' + email;
 }
 async function refreshAdmin(){
@@ -2059,7 +2066,12 @@ async function refreshAdmin(){
     const me = await api('GET', BASE + '/api/admin/me');
     showAdminPanel(me.email);
     const data = await api('GET', BASE + '/api/admin/data');
-    renderAdminTable(data.rows || []);
+    const rows = data.rows || [];
+    const links = data.links || [];
+    const meta = document.getElementById('adminMeta');
+    meta.textContent = meta.textContent + ' · личностей: ' + rows.filter(r => r.response_id != null).length + ' · связей: ' + links.length;
+    renderAdminTable(rows);
+    renderAdminLinks(links);
   } catch(e){
     showAdminLogin();
     if(e.status !== 401) document.getElementById('adminLoginError').textContent = e.message;
@@ -2088,12 +2100,33 @@ async function adminLogout(){
   catch(e){ /* сессия всё равно сбрасывается на экране */ }
   showAdminLogin();
 }
+const LINK_CHANNEL_NAMES = {emotion:'эмоция', resource:'ресурс', goal:'цель'};
+function renderAdminLinks(links){
+  const wrap = document.getElementById('adminLinks');
+  if(!wrap) return;
+  if(!links.length){
+    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>Связей пока нет.</div>';
+    return;
+  }
+  const channels = ['emotion','resource','goal'];
+  const head = '<tr><th>Дата</th><th>Контекст</th><th>Кто</th><th>С кем</th><th>ρ цикла</th><th>Громкий канал</th></tr>';
+  const body = links.map(link => {
+    const when = link.created_at ? new Date(link.created_at).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+    let best = null;
+    [['я → он', link.matrix_out], ['он → я', link.matrix_in]].forEach(([direction, matrix]) => {
+      (matrix || []).forEach((row, r) => row.forEach((cell, c) => {
+        const amp = Math.hypot(cell.re || 0, cell.im || 0);
+        if(!best || amp > best.amp) best = {amp, text: direction + ' · ' + LINK_CHANNEL_NAMES[channels[r]] + ' → ' + LINK_CHANNEL_NAMES[channels[c]]};
+      }));
+    });
+    const loud = best && best.amp > 1e-9 ? best.text : '—';
+    const cells = [when, link.context === 'work' ? 'работа' : 'семья', link.self_name || '', link.partner_name || '', link.radius == null ? '' : link.radius, loud];
+    return '<tr>' + cells.map(c => '<td>' + escapeHtml(c) + '</td>').join('') + '</tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="admin-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
+}
 function renderAdminTable(rows){
   const wrap = document.getElementById('adminTable');
-  const filled = rows.filter(r => r.response_id != null);
-  const meta = document.getElementById('adminMeta');
-  const who = meta.textContent;
-  meta.textContent = who + ' · записей: ' + filled.length;
   if(!rows.length){
     wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>База пока пуста.</div>';
     return;
@@ -2117,6 +2150,9 @@ window.addEventListener('popstate', () => {
   if(isAdminPath()) openAdmin(true);
   else show('intro');
 });
+
+const linksHome = document.getElementById('linksHomeLink');
+if(linksHome) linksHome.href = (BASE || '') + '/links';
 
 if(isAdminPath()) openAdmin(true);
 else updateProfileCount();
