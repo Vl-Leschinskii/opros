@@ -115,7 +115,7 @@
     <div class="brand">Матрица связи</div>
     <h1>Общение <span class="amp">/</span> комплексные элементы</h1>
     <nav class="main-nav">
-      <a class="nav-btn" id="navHome" href="/">Личность</a>
+      <a class="nav-btn" id="navHome" href="/">Главная</a>
       <button class="nav-btn active" id="navLinks" type="button" onclick="show('intro')">Связь</button>
       <button class="nav-btn" id="navMine" type="button" onclick="showLinks()">Мои связи <span id="linkCount"></span></button>
     </nav>
@@ -137,9 +137,6 @@
           <div class="mc-title">На работе</div>
           <div class="mc-desc">Отношение к делу, запас сил на задачи, решения о том, куда вести работу.</div>
         </button>
-      </div>
-      <div class="intro-links">
-        <button class="btn ghost small" type="button" onclick="showLinks()">Мои связи <span id="linkCount2"></span></button>
       </div>
       <div class="scale-note">
         <b>Три канала.</b> Эмоция, ресурс и цель. На каждую пару каналов два вопроса: насколько сильно один сдвигает другой и с какой фазой — сразу или с задержкой, в ту же сторону или в противоположную.
@@ -356,7 +353,6 @@ async function updateCount(){
     label = data.links.length ? '(' + data.links.length + ')' : '';
   } catch(e){}
   document.getElementById('linkCount').textContent = label;
-  document.getElementById('linkCount2').textContent = label;
 }
 
 function chooseContext(value){
