@@ -60,6 +60,15 @@
   .scale-note ul{margin:6px 0 0 18px;}
   .citation{margin-top:18px;padding:14px 18px;background:#fdfcf9;border:1px solid var(--line);border-radius:0 10px 10px 0;border-left:3px solid var(--purple);font-size:13px;color:#4a4460;font-family:Georgia,serif;}
   .citation .cit-author{color:var(--purple);font-weight:700;font-size:12px;}
+  .glossary{margin-top:22px;background:#fdfcf9;border:1px solid var(--line);border-radius:14px;padding:18px 18px 8px;}
+  .glossary h3{font-family:Georgia,serif;font-size:18px;font-weight:400;margin-bottom:6px;}
+  .glossary .gl-lead{font-size:13.5px;color:#5a5470;margin-bottom:14px;}
+  .gl-item{padding:12px 0;border-top:1px solid var(--line);}
+  .gl-item .gl-name{font-family:Georgia,serif;font-size:16px;margin-bottom:4px;}
+  .gl-item .gl-name .re{color:var(--gold)} .gl-item .gl-name .im{color:var(--purple)}
+  .gl-item p{font-size:13.5px;color:#4a4460;line-height:1.5;}
+  .gl-cross{margin:4px 0 12px;padding-left:16px;font-size:13.5px;color:#4a4460;}
+  .gl-cross li{margin-bottom:4px;}
   .setup-step{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin-bottom:8px;}
   .setup-card h2,.profiles-card h2{font-family:Georgia,serif;font-size:24px;font-weight:400;margin-bottom:10px;}
   .setup-desc,.profiles-desc{font-size:14px;color:#5a5470;margin-bottom:18px;}
@@ -146,6 +155,38 @@
           <li>Результат виден только в том браузере, откуда анкета отправлена.</li>
         </ul>
       </div>
+      <div class="glossary">
+        <h3>Расшифровка каналов</h3>
+        <p class="gl-lead">Строка матрицы — что меняется у источника. Столбец — что от этого сдвигается у адресата. Клетка на пересечении и есть элемент связи.</p>
+        <div class="gl-item">
+          <div class="gl-name"><span class="re">Эмоция</span></div>
+          <p>Настроение и чувства: как человек переживает происходящее. В семье — настроение дома. На работе — настрой к делу.</p>
+        </div>
+        <div class="gl-item">
+          <div class="gl-name"><span class="im">Ресурс</span></div>
+          <p>Запас сил и времени: сколько человек может отдать. В семье — силы и время на дом. На работе — силы и время на задачи.</p>
+        </div>
+        <div class="gl-item">
+          <div class="gl-name">Цель</div>
+          <p>Куда человек ведёт общее дело: его решение о направлении. В семье — к чему он ведёт семью. На работе — к чему ведёт работу.</p>
+        </div>
+        <div class="gl-item">
+          <div class="gl-name">Что значит влияние канала на канал</div>
+          <p>Одинаковые каналы на диагонали — один и тот же слой сдвигается у обоих. Разные каналы — сдвиг переходит в другой слой.</p>
+          <ul class="gl-cross">
+            <li><b>Эмоция → эмоция.</b> Чувства одного меняют настроение другого.</li>
+            <li><b>Эмоция → ресурс.</b> Чувства одного забирают или возвращают силы и время другого.</li>
+            <li><b>Эмоция → цель.</b> Чувства одного сдвигают решение другого, куда вести общее дело.</li>
+            <li><b>Ресурс → эмоция.</b> Нехватка или запас сил одного меняет настроение другого.</li>
+            <li><b>Ресурс → ресурс.</b> Силы и время одного тянут за собой или освобождают запас другого.</li>
+            <li><b>Ресурс → цель.</b> Нехватка сил одного меняет, куда другой ведёт общее дело.</li>
+            <li><b>Цель → эмоция.</b> Смена решения одного меняет настроение другого.</li>
+            <li><b>Цель → ресурс.</b> Смена направления одного забирает или высвобождает силы другого.</li>
+            <li><b>Цель → цель.</b> Решение одного сдвигает решение другого о том, куда идти.</li>
+          </ul>
+          <p>Сила — насколько сдвиг заметен. Фаза — в ту же сторону или в противоположную, сразу или с задержкой. «Я → он» и «он → я» — два разных влияния: они не обязаны совпадать.</p>
+        </div>
+      </div>
       <div class="citation">
         <span class="cit-author">В. Лещинский</span><br>
         Оценка по модели «Динамика открытых систем на ориентированных графах»: амплитуда и фаза канала влияния. Это не измеренный спектр коллектива.
@@ -195,6 +236,14 @@
     </div>
     <div class="save-panel" id="savePanel"></div>
     <div id="resBody"></div>
+    <div class="glossary">
+      <h3>Как читать клетки</h3>
+      <p class="gl-lead">Строка — канал источника, столбец — канал адресата.</p>
+      <div class="gl-item">
+        <div class="gl-name"><span class="re">Эмоция</span> — настроение и чувства. <span class="im">Ресурс</span> — силы и время. Цель — решение, куда вести общее дело.</div>
+        <p style="margin-top:8px">Диагональ (эмоция→эмоция, ресурс→ресурс, цель→цель) — тот же слой у обоих. Остальные клетки — сдвиг переходит в другой слой: чувства меняют запас сил, нехватка сил меняет решение, смена цели меняет настроение. Сила клетки — насколько сдвиг заметен, фаза — сразу или с задержкой, в ту же сторону или в противоположную.</p>
+      </div>
+    </div>
     <div class="res-actions">
       <button class="btn ghost" type="button" onclick="showLinks()">← Мои связи</button>
       <button class="btn ghost" type="button" onclick="show('intro')">Новая связь</button>
