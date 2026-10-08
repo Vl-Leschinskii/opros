@@ -985,13 +985,90 @@ def matrices_from_answers_v2(answers):
     return matrix_out, matrix_in, radius
 
 
+def _v2_cell_complex(cell):
+    if isinstance(cell, complex):
+        return cell
+    return complex(float(cell["re"]), float(cell["im"]))
+
+
+def _v2_cell_delay(cell):
+    value = _v2_cell_complex(cell)
+    if abs(value) < 1e-12:
+        return None
+    angle = math.degrees(math.atan2(value.imag, value.real)) % 360
+    # Положительный x занимает 0°…90°, отрицательный — 180°…270°.
+    if angle > 90:
+        angle = (angle - 180) % 360
+    return min(90.0, max(0.0, angle))
+
+
+def _directional_influence_v2(matrix):
+    values = [[abs(_v2_cell_complex(cell)) for cell in row] for row in matrix]
+    total = sum(sum(row) for row in values)
+    active = sum(value > 1e-12 for row in values for value in row)
+    weighted_delay = sum(
+        values[row][col] * (_v2_cell_delay(matrix[row][col]) or 0.0)
+        for row in range(3)
+        for col in range(3)
+    )
+    source = [round(sum(values[row]) / 6, 4) for row in range(3)]
+    target = [
+        round(sum(values[row][col] for row in range(3)) / 6, 4)
+        for col in range(3)
+    ]
+    return {
+        "strength": round(total / 18, 4),
+        "coverage": round(active / 9, 4),
+        "delay": round(weighted_delay / total, 2) if total > 1e-12 else None,
+        "source": dict(zip(LINK_CHANNELS, source)),
+        "target": dict(zip(LINK_CHANNELS, target)),
+    }
+
+
+def leadership_summary_v2(matrix_out, matrix_in):
+    out = _directional_influence_v2(matrix_out)
+    incoming = _directional_influence_v2(matrix_in)
+    total = out["strength"] + incoming["strength"]
+    index = (
+        (out["strength"] - incoming["strength"]) / total
+        if total > 1e-12
+        else 0.0
+    )
+    magnitude = abs(index)
+    if total <= 1e-12:
+        classification = "inactive"
+        leader_direction = None
+    elif magnitude < 1 / 3:
+        classification = "balanced"
+        leader_direction = None
+    else:
+        leader_direction = "out" if index > 0 else "in"
+        leader = out if leader_direction == "out" else incoming
+        if magnitude < 1 / 2:
+            classification = "tendency"
+        elif leader["coverage"] >= 2 / 3:
+            classification = "system"
+        else:
+            classification = "local"
+    return {
+        "out": out,
+        "in": incoming,
+        "index": round(index, 4),
+        "classification": classification,
+        "leader_direction": leader_direction,
+    }
+
+
 def link_v2_to_dict(row, with_answers=True):
+    matrix_out = json.loads(row["matrix_out"])
+    matrix_in = json.loads(row["matrix_in"])
     item = {
         "id": row["id"], "version": 2, "context": row["context"],
         "self_name": row["self_name"], "partner_name": row["partner_name"],
         "radius": row["radius"], "created_at": row["created_at"],
-        "matrix_out": json.loads(row["matrix_out"]),
-        "matrix_in": json.loads(row["matrix_in"]),
+        "matrix_out": matrix_out,
+        "matrix_in": matrix_in,
+        "leadership": leadership_summary_v2(matrix_out, matrix_in),
     }
     if with_answers:
         item["answers"] = json.loads(row["answers"])
@@ -1437,11 +1514,11 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_GET(self, path):
         if path in ("/", "/index.html", "/admin", "/admin/"):
             self._visitor_token()  # выдать cookie при первом заходе
-            self._send_file("index.html", "text/html; charset=utf-8")
+            self._send_file("index-v2.html", "text/html; charset=utf-8")
             return True
         if path in ("/links", "/links/"):
             self._visitor_token()
-            self._send_file("links.html", "text/html; charset=utf-8")
+            self._send_file("links-v2.html", "text/html; charset=utf-8")
             return True
         if path in ("/v2", "/v2/", "/v2/index.html", "/v2/admin", "/v2/admin/"):
             self._visitor_token()

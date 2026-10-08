@@ -438,7 +438,6 @@
     <nav class="main-nav">
       <button class="nav-btn active" id="navHomeBtn" onclick="navTo('intro')">Главная</button>
       <a class="nav-btn" id="navLinksBtn" href="links">Связи</a>
-      <a class="nav-btn" id="navV1Btn" href="/">Версия 1</a>
       <button class="nav-btn" id="navTypoBtn" onclick="navTo('typology')">Типология</button>
       <button class="nav-btn" id="navProfilesBtn" onclick="showProfiles()">Профили <span id="profileCount"></span></button>
     </nav>
@@ -2051,9 +2050,9 @@ const ADMIN_VECTORS = [
   ['mysh','Мыш'], ['kozh','Кож'], ['or','Ор'], ['zr','Зр'],
   ['an','Ан'], ['ur','Ур'], ['zv','Зв'], ['ob','Об']
 ];
-function isAdminPath(){ return /\/v2\/admin\/?$/.test(location.pathname); }
+function isAdminPath(){ return /\/admin\/?$/.test(location.pathname); }
 function openAdmin(fromPop){
-  if(!fromPop && !isAdminPath()) history.pushState({view:'admin'}, '', (BASE || '') + '/v2/admin');
+  if(!fromPop && !isAdminPath()) history.pushState({view:'admin'}, '', (BASE || '') + '/admin');
   show('admin');
   refreshAdmin();
 }
@@ -2159,8 +2158,7 @@ window.addEventListener('popstate', () => {
   else show('intro');
 });
 
-document.getElementById('navLinksBtn').href = (BASE || '') + '/v2/links';
-document.getElementById('navV1Btn').href = (BASE || '') + '/';
+document.getElementById('navLinksBtn').href = (BASE || '') + '/links';
 
 if(isAdminPath()) openAdmin(true);
 else updateProfileCount();
