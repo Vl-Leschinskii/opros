@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Я / Мы — опросник комплексной модели личности</title>
+<title>Я / Мы v2 — центрированный профиль личности</title>
 <style>
   :root{
     --bg:#f7f4ee; --card:#ffffff; --ink:#241f38; --muted:#7a7290;
@@ -206,6 +206,9 @@
   .vec-row{display:grid;grid-template-columns:120px 1fr 42px;align-items:center;gap:12px;margin-bottom:11px;font-size:14px;}
   .vec-row .name{color:#4a4460;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .vec-row .track{height:9px;background:#efeade;border-radius:99px;overflow:hidden;}
+  .vec-row .track.signed{position:relative;}
+  .vec-row .track.signed::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:#7a7290;opacity:.65;}
+  .vec-row .track.signed .fill{position:absolute;top:0;}
   .vec-row .fill{height:100%;border-radius:99px;width:0;transition:width .8s cubic-bezier(.4,0,.2,1);}
   .vec-row .fill.re{background:linear-gradient(90deg,#e0c46a,#b8912f)}
   .vec-row .fill.im{background:linear-gradient(90deg,#a98fd0,#6b4c9a)}
@@ -430,12 +433,12 @@
 <div class="app">
 
   <header class="top">
-    <div class="brand">Комплексная модель личности</div>
-    <h1>Я <span class="amp">/</span> Мы — опросник самоидентификации</h1>
+    <div class="brand">Комплексная модель личности · v2</div>
+    <h1>Я <span class="amp">/</span> Мы — центрированный профиль</h1>
     <nav class="main-nav">
       <button class="nav-btn active" id="navHomeBtn" onclick="navTo('intro')">Главная</button>
       <a class="nav-btn" id="navLinksBtn" href="links">Связи</a>
-      <a class="nav-btn" id="navV2Btn" href="/v2/">Версия 2</a>
+      <a class="nav-btn" id="navV1Btn" href="/">Версия 1</a>
       <button class="nav-btn" id="navTypoBtn" onclick="navTo('typology')">Типология</button>
       <button class="nav-btn" id="navProfilesBtn" onclick="showProfiles()">Профили <span id="profileCount"></span></button>
     </nav>
@@ -462,13 +465,13 @@
       <div class="scale-note">
         <b>Как отвечать.</b> Оцените каждое утверждение по шкале:
         <ul>
-          <li><b>0</b> — совсем не про меня / не про него(неё)</li>
-          <li><b>1</b> — скорее не про меня / не про него(неё)</li>
-          <li><b>2</b> — иногда / отчасти</li>
-          <li><b>3</b> — скорее про меня / про него(неё)</li>
-          <li><b>4</b> — очень про меня / про него(неё)</li>
+          <li><b>−2</b> — совсем не про меня / не про него(неё)</li>
+          <li><b>−1,33</b> — скорее не про меня / не про него(неё)</li>
+          <li><b>0</b> — иногда / отчасти, нейтральная точка</li>
+          <li><b>+1,33</b> — скорее про меня / про него(неё)</li>
+          <li><b>+2</b> — очень про меня / про него(неё)</li>
         </ul>
-        Отвечайте первым импульсом.
+        Номера клавиш 0…4 выбирают эти пять вариантов. Отвечайте первым импульсом.
       </div>
 
       <!-- Отсылка к исходной работе -->
@@ -538,7 +541,7 @@
         <svg class="plane" viewBox="0 0 400 400" id="planeSvg"></svg>
       </div>
       <div class="angle-legend">
-        <div class="al-item"><span class="al-line bal"></span>φ — от баланса (40, 40)</div>
+        <div class="al-item"><span class="al-line bal"></span>φ — от баланса (0, 0)</div>
       </div>
     </div>
 
@@ -551,7 +554,7 @@
         <div class="quad-meta">
           <div class="qm-name" id="qName">Ядро</div>
           <div class="qm-tagline" id="qTagline">Полная, целостная, интегрированная личность</div>
-          <div class="quad-coords" id="qCoords">Я ≥ 40, Мы ≥ 40</div>
+          <div class="quad-coords" id="qCoords">Я ≥ 0, Мы ≥ 0</div>
         </div>
       </div>
       <div class="verdict" id="qVerdict"></div>
@@ -646,7 +649,7 @@
     <div class="typo-hero">
       <div class="eyebrow">Типология · 4 квадранта · 8 угловых секторов</div>
       <h2>Комплексная плоскость Я / Мы: квадранты и направления</h2>
-      <p>Начало координат сдвинуто в точку условного баланса (40, 40). Угол φ отсчитывается от этой точки и попадает в один из четырёх квадрантов и один из восьми угловых секторов.</p>
+      <p>Начало координат сдвинуто в точку условного баланса (0, 0). Угол φ отсчитывается от этой точки и попадает в один из четырёх квадрантов и один из восьми угловых секторов.</p>
       <div class="axis-list">
         <div class="al"><b>u = Я − 40</b> — отклонение мотивации</div>
         <div class="al"><b>v = Мы − 40</b> — отклонение взаимодействия</div>
@@ -672,7 +675,7 @@
           <text x="120" y="340" font-family="Georgia,serif" font-size="14" fill="#7a7290" text-anchor="middle">III · Кокон</text>
           <text x="280" y="340" font-family="Georgia,serif" font-size="14" fill="#b8912f" text-anchor="middle">IV · Ось</text>
           <circle cx="200" cy="200" r="3.5" fill="#241f38"/>
-          <text x="208" y="196" font-family="Georgia,serif" font-size="11" fill="#7a7290">баланс (40, 40)</text>
+          <text x="208" y="196" font-family="Georgia,serif" font-size="11" fill="#7a7290">баланс (0, 0)</text>
           <g id="typoUserMarker" style="display:none">
             <circle r="14" fill="rgba(36,31,56,.14)"/>
             <circle r="7" fill="#241f38"/>
@@ -709,7 +712,7 @@
           <li><b>Уровень 2.</b> Четыре четверти: Яниз, Яверх, Мыниз, Мыверх.</li>
           <li><b>Уровень 3.</b> Восемь векторов: анальный, уретральный, звуковой, обонятельный (Я); мышечный, кожный, оральный, зрительный (Мы).</li>
           <li><b>Единый бинарный признак.</b> Сохранение (статика) ↔ Изменение (динамика) — на каждом уровне.</li>
-          <li><b>Модуль |z|</b> — сила личности; <b>аргумент φ</b> — баланс мотивации и взаимодействия.</li>
+          <li><b>Модуль |z|</b> — выраженность отклонения от нейтральной точки; <b>аргумент φ</b> — направление этого отклонения.</li>
           <li><b>Динамика.</b> z(t) — траектория развития героя; в драматургии: конфликт = разность, любовь = сопряжение, сверхзадача = |z| → max, характер = arg(z).</li>
         </ul>
         <span class="tl-arrow">→ Полный текст: «Фрактальная свёртка восьми векторов», В. Лещинский, октябрь 2006.</span>
@@ -831,6 +834,8 @@ const N = QUESTIONS.length;
 
 const LABELS_SELF  = ['совсем не про меня','скорее не про меня','иногда / отчасти','скорее про меня','очень про меня'];
 const LABELS_OTHER = ['совсем не про него(неё)','скорее не про него(неё)','иногда / отчасти','скорее про него(неё)','очень про него(неё)'];
+const SCORE_MAP = [-2, -4/3, 0, 4/3, 2];
+const SCORE_LABELS = ['−2','−1,33','0','+1,33','+2'];
 
 const DESC = {
   mysh:{hi:'Сила, действие, подчинение. Опора стаи, человек дела.',lo:'Простая физическая реакция и роль исполнителя выражены слабо.'},
@@ -844,17 +849,17 @@ const DESC = {
 };
 
 const QUADRANTS = {
-  I: { roman:'I', cls:'q1', name:'Ядро', coords:'Я↑ Мы↑', condition:'Я ≥ 40, Мы ≥ 40',
+  I: { roman:'I', cls:'q1', name:'Ядро', coords:'Я↑ Мы↑', condition:'Я ≥ 0, Мы ≥ 0',
        tagline:'Полная, целостная, интегрированная личность',
        image:'Ядро, кристалл, солнце в центре системы. Энергия идёт одновременно и внутрь, и наружу.',
        vectors:'Как правило, высокие баллы по обеим половинам: анальный + уретральный, оральный + зрительный; звуковой + обонятельный, мышечный + кожный.',
-       strengths:['Высокая общая энергия — |z| велик','Умеете действовать и одновременно быть в контакте','Устойчивость: есть и внутренняя опора, и внешняя сеть','Гибкость: смещаетесь к любому полюсу по ситуации'],
-       risks:['«Расфокус»: много энергии, но куда её направить?','Притягиваете других — риск манипуляций','Сложность выбора: обе оси тянут с равной силой','Синдром отличника — стремление быть везде и всюду'],
+       strengths:['Обе оси выраженно отклонены в положительную сторону','Умеете действовать и одновременно быть в контакте','Устойчивость: есть и внутренняя опора, и внешняя сеть','Гибкость: смещаетесь к любому полюсу по ситуации'],
+       risks:['«Расфокус»: много возможностей, но куда их направить?','Притягиваете других — риск манипуляций','Сложность выбора: обе оси тянут с равной силой','Синдром отличника — стремление быть везде и всюду'],
        relations:'Центральная фигура, к которой тянутся. Можете быть лидером, но не авторитарным.',
        heroes:'Кирк («Стартрек», 2009), Гэндальф, Спок в зрелости.',
        growth:'Не потерять глубину при расширении. Баланс — не застывшая точка, а динамика.',
        verdict:'Квадрант <b>Ядро</b>. Обе оси развиты выше условного баланса: есть и внутренняя мотивация, и способность к взаимодействию.' },
-  II: { roman:'II', cls:'q2', name:'Резонанс', coords:'Я↓ Мы↑', condition:'Я < 40, Мы ≥ 40',
+  II: { roman:'II', cls:'q2', name:'Резонанс', coords:'Я↓ Мы↑', condition:'Я < 0, Мы ≥ 0',
        tagline:'Социальная, встроенная, отражающая личность',
        image:'Резонанс, эхо, зеркало, струна, звучащая в ответ. Энергия идёт преимущественно наружу.',
        vectors:'Мышечный, кожный, оральный, зрительный. Из «Я»-векторов могут быть развиты звуковой и обонятельный, но анальный и уретральный — слабее.',
@@ -864,7 +869,7 @@ const QUADRANTS = {
        heroes:'Жанна д’Арк (Бессон), Офелия, Соня Мармеладова.',
        growth:'Вернуть себе ось Я. Найти анальный стержень и уретральный импульс.',
        verdict:'Квадрант <b>Резонанс</b>. Ось взаимодействия развита выше баланса, ось мотивации — ниже. Задача роста — вернуть себе ось Я.' },
-  III: { roman:'III', cls:'q3', name:'Кокон', coords:'Я↓ Мы↓', condition:'Я < 40, Мы < 40',
+  III: { roman:'III', cls:'q3', name:'Кокон', coords:'Я↓ Мы↓', condition:'Я < 0, Мы < 0',
        tagline:'Закрытая, свёрнутая, истощённая личность',
        image:'Кокон, раковина, зимовка, сжатая пружина.',
        vectors:'Размытые. Могут быть слегка повышены звуковой или обонятельный.',
@@ -874,7 +879,7 @@ const QUADRANTS = {
        heroes:'Гамлет до Призрака, Сальери, Мерсо.',
        growth:'Пробить кокон. Начать с малого действия (мышечный вектор), с простого контакта (кожный).',
        verdict:'Квадрант <b>Кокон</b>. Обе оси ниже условного баланса. Пружина сжата, но не сломана.' },
-  IV: { roman:'IV', cls:'q4', name:'Ось', coords:'Я↑ Мы↓', condition:'Я ≥ 40, Мы < 40',
+  IV: { roman:'IV', cls:'q4', name:'Ось', coords:'Я↑ Мы↓', condition:'Я ≥ 0, Мы < 0',
        tagline:'Автономная, самодостаточная, мотивационная личность',
        image:'Ось, стержень, скала, маяк.',
        vectors:'Анальный, уретральный, звуковой, обонятельный.',
@@ -898,7 +903,7 @@ const ANGLE_SECTORS = [
     tagline:'И мотивация, и взаимодействие превышают баланс примерно одинаково.',
     detail:'Самое гармоничное положение. Внутренние смыслы и внешние связи растут параллельно.',
     strengths:['Гармония внутреннего и внешнего','Устойчивость и гибкость одновременно','Умение и вести, и слушать'],
-    risks:['«Расфокус»: много энергии, но куда её направить','Притягиваете манипуляторов','Синдром отличника'],
+    risks:['«Расфокус»: много возможностей, но куда их направить','Притягиваете манипуляторов','Синдром отличника'],
     growth:'Удерживать баланс как динамику, а не как застывшую точку.',
     heroes:'Кирк («Стартрек», 2009), Гэндальф.' },
   { name:'Чистая ось Мы', short:'φ ≈ +90°', range:'+67.5°…+112.5°', dir:'Рост строго по взаимодействию',
@@ -946,7 +951,7 @@ const ANGLE_SECTORS = [
 ];
 
 const DISTANCE_LEVELS = [
-  { max: 8,   name:'Очень близко к балансу', desc:'Профиль почти не отклоняется от точки (40, 40).' },
+  { max: 8,   name:'Очень близко к балансу', desc:'Профиль почти не отклоняется от точки (0, 0).' },
   { max: 18,  name:'Умеренное отклонение',   desc:'Профиль отклонён от баланса, но не радикально.' },
   { max: 30,  name:'Выраженное отклонение',  desc:'Профиль сильно отклонён от баланса. Тип ярко проявлен.' },
   { max: 999, name:'Сильное отклонение',     desc:'Профиль экстремально далёк от баланса.' }
@@ -978,12 +983,12 @@ async function api(method, path, body){
 const BASE = (location.pathname === '/opros' || location.pathname.startsWith('/opros/')) ? '/opros' : '';
 const DB = {
   /* Только мои профили: те, по которым «Я о себе» заполнено из этого браузера (cookie). */
-  listSubjects: () => api('GET', BASE + '/api/subjects').then(d => d.subjects),
+  listSubjects: () => api('GET', BASE + '/api/v2/subjects').then(d => d.subjects),
   /* Все псевдонимы — только для подсказок при вводе, без содержимого профилей. */
-  listNames:    () => api('GET', BASE + '/api/subjects').then(d => d.names || []),
-  getSubject:   name => api('GET', BASE + '/api/subjects/' + encodeURIComponent(name)),
-  saveResponse: payload => api('POST', BASE + '/api/responses', payload),
-  deleteSubject: name => api('DELETE', BASE + '/api/subjects/' + encodeURIComponent(name))
+  listNames:    () => api('GET', BASE + '/api/v2/subjects').then(d => d.names || []),
+  getSubject:   name => api('GET', BASE + '/api/v2/subjects/' + encodeURIComponent(name)),
+  saveResponse: payload => api('POST', BASE + '/api/v2/responses', payload),
+  deleteSubject: name => api('DELETE', BASE + '/api/v2/subjects/' + encodeURIComponent(name))
 };
 function saveSelfResponse(name, answers, overwrite){
   return DB.saveResponse({ mode:'self', subject:name, answers:answers.slice(), overwrite: !!overwrite });
@@ -1111,7 +1116,7 @@ function renderQuestion(){
   for(let i=0;i<5;i++){
     const b = document.createElement('button');
     b.className = 'opt' + (answers[current]===i ? ' selected' : '');
-    b.innerHTML = '<span class="num">'+i+'</span><span>'+labels[i]+'</span>';
+    b.innerHTML = '<span class="num">'+SCORE_LABELS[i]+'</span><span>'+labels[i]+'</span>';
     b.onclick = ()=> selectOption(i);
     qOptions.appendChild(b);
   }
@@ -1144,12 +1149,13 @@ document.addEventListener('keydown', e=>{
 
 function scoresFromAnswers(ans){
   const s = {}; VECTORS.forEach(v=> s[v.id]=0);
-  QUESTIONS.forEach((q,idx)=>{ if(ans[idx]!==null) s[q.vid] += ans[idx]; });
+  QUESTIONS.forEach((q,idx)=>{ if(ans[idx]!==null) s[q.vid] += SCORE_MAP[ans[idx]]; });
+  VECTORS.forEach(v=> s[v.id] = Math.round(s[v.id] * 10000) / 10000);
   return s;
 }
 function computeScores(){ return scoresFromAnswers(answers); }
 function getQuadrantKey(Ya, My){
-  const u = Ya - 40, v = My - 40;
+  const u = Ya, v = My;
   if(u >= 0 && v >= 0) return 'I';
   if(u < 0 && v >= 0) return 'II';
   if(u < 0 && v < 0) return 'III';
@@ -1179,9 +1185,9 @@ function summaryFromScores(s){
   const Save = s.an + s.zv + s.mysh + s.zr;
   const Change = s.ur + s.ob + s.kozh + s.or;
   const mod = Math.sqrt(Ya*Ya + My*My);
-  const modMax = Math.sqrt(80*80 + 80*80);
+  const modMax = Math.sqrt(40*40 + 40*40);
   const modPct = Math.round(mod/modMax*100);
-  const dx = Ya - 40, dy = My - 40;
+  const dx = Ya, dy = My;
   const dev = Math.sqrt(dx*dx + dy*dy);
   const phi = (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) ? 0 : Math.atan2(dy, dx) * 180 / Math.PI;
   const quad = getQuadrantKey(Ya, My);
@@ -1242,10 +1248,11 @@ function renderResultView(sum, opts){
 
   document.getElementById('resEyebrow').textContent = opts.eyebrow || 'Ваше комплексное число личности';
   document.getElementById('zDisplay').innerHTML =
-    '<span class="re">'+Ya+'</span> + <span class="im">i · '+My+'</span>';
+    '<span class="re">'+fmt1(Ya)+'</span> ' + (My < 0 ? '−' : '+') +
+    ' <span class="im">i · '+fmt1(Math.abs(My))+'</span>';
   document.getElementById('zNumbers').innerHTML =
     '<span class="big">|z| = ' + Math.round(sum.mod) + '</span> <span class="lbl">(' + modPct + '% от максимума)</span><br>' +
-    '<span class="lbl">φ от баланса (40, 40):</span> <span class="phi-bal">' + fmtAngle(phi) + '°</span>' +
+    '<span class="lbl">φ от баланса (0, 0):</span> <span class="phi-bal">' + fmtAngle(phi) + '°</span>' +
     ' &nbsp;·&nbsp; <span class="lbl">d =</span> <span class="dev">' + fmt1(dev) + '</span>';
 
   const now = new Date();
@@ -1260,8 +1267,8 @@ function renderResultView(sum, opts){
   renderQuadrantPanel(quad);
   renderAnglePanel(sum);
 
-  const total = Ya + My || 1;
-  const rePct = Math.round(Ya/total*100), imPct = 100 - rePct;
+  const centeredPct = (value, max) => Math.round((value + max) / (2 * max) * 100);
+  const rePct = centeredPct(Ya,40), imPct = centeredPct(My,40);
   document.getElementById('barRe').style.flex = rePct;
   document.getElementById('barIm').style.flex = imPct;
   document.getElementById('barRe').textContent = rePct + '%';
@@ -1270,8 +1277,7 @@ function renderResultView(sum, opts){
   document.getElementById('valIm').textContent = My;
   document.getElementById('balanceVerdict').innerHTML = balanceText(Ya, My, quad, opts.isOther);
 
-  const yaTot = YaLow + YaHigh || 1;
-  const yaL = Math.round(YaLow/yaTot*100), yaH = 100 - yaL;
+  const yaL = centeredPct(YaLow,20), yaH = centeredPct(YaHigh,20);
   document.getElementById('barYaLow').style.flex = yaL;
   document.getElementById('barYaHigh').style.flex = yaH;
   document.getElementById('barYaLow').textContent = yaL+'%';
@@ -1280,8 +1286,7 @@ function renderResultView(sum, opts){
   document.getElementById('valYaHigh').textContent = YaHigh;
   document.getElementById('yaVerdict').textContent = levelText(YaLow, YaHigh, 'мотивация');
 
-  const myTot = MyLow + MyHigh || 1;
-  const myL = Math.round(MyLow/myTot*100), myH = 100 - myL;
+  const myL = centeredPct(MyLow,20), myH = centeredPct(MyHigh,20);
   document.getElementById('barMyLow').style.flex = myL;
   document.getElementById('barMyHigh').style.flex = myH;
   document.getElementById('barMyLow').textContent = myL+'%';
@@ -1290,8 +1295,7 @@ function renderResultView(sum, opts){
   document.getElementById('valMyHigh').textContent = MyHigh;
   document.getElementById('myVerdict').textContent = levelText(MyLow, MyHigh, 'взаимодействие');
 
-  const scTot = Save + Change || 1;
-  const saveP = Math.round(Save/scTot*100), chP = 100 - saveP;
+  const saveP = centeredPct(Save,40), chP = centeredPct(Change,40);
   document.getElementById('barSave').style.flex = saveP;
   document.getElementById('barChange').style.flex = chP;
   document.getElementById('barSave').textContent = saveP+'%';
@@ -1316,7 +1320,7 @@ function renderAnglePanel(sum){
     '<div class="ap-head">' +
       '<div class="ap-compass"><svg viewBox="0 0 200 200" id="angleCompass"></svg></div>' +
       '<div class="ap-meta">' +
-        '<div class="ap-eyebrow">Угол от точки баланса (40, 40)</div>' +
+        '<div class="ap-eyebrow">Угол от точки баланса (0, 0)</div>' +
         '<div class="ap-angle"><span class="ap-phi">' + phiStr + '</span> <span class="ap-d">· d = ' + fmt1(sum.dev) + '</span></div>' +
         '<div class="ap-sector ' + paletteCls + '">' + sector.name + '</div>' +
         '<div class="ap-range">' + sector.range + ' · ' + sector.short + '</div>' +
@@ -1435,7 +1439,7 @@ function renderSavePanel(){
 
 function balanceText(Ya, My, quad, isOther){
   const diff = Ya - My, thr = 12;
-  if(quad === 'III') return '<b>Формальный баланс на низком уровне.</b> Обе оси ниже условного баланса (40). Это не «равновесие» в смысле гармонии, а <b>равновесие в коконе</b>.';
+  if(quad === 'III') return '<b>Формальный баланс в отрицательной области.</b> Обе оси ниже нейтральной точки (0). Это не «равновесие» в смысле гармонии, а <b>равновесие в коконе</b>.';
   if(Math.abs(diff) <= thr){
     if(quad === 'I') return '<b>Баланс на высоком уровне.</b> Обе оси выше 40. Это «ядро»: и мотивация, и взаимодействие развиты соразмерно.';
     return '<b>Баланс.</b> Мотивация и взаимодействие развиты соразмерно.';
@@ -1479,37 +1483,36 @@ function drawPlane(Ya, My, phi){
     if(text!==undefined) e.textContent = text;
     svg.appendChild(e); return e;
   };
-  const ox = 40, oy = 360, scale = 4;
-  const bx = ox + 40 * scale, by = oy - 40 * scale;
-  const px = ox + Ya * scale, py = oy - My * scale;
+  const bx = 200, by = 200, scale = 160/40;
+  const px = bx + Ya * scale, py = by - My * scale;
 
-  el('rect',{x:bx,y:40,width:320,height:by-40,fill:'rgba(184,145,47,.07)'});
-  el('rect',{x:40,y:40,width:bx-40,height:by-40,fill:'rgba(107,76,154,.07)'});
-  el('rect',{x:40,y:by,width:bx-40,height:320,fill:'rgba(120,114,144,.08)'});
-  el('rect',{x:bx,y:by,width:320,height:320,fill:'rgba(184,145,47,.04)'});
-
-  [20,40,60,80].forEach(v=>{
-    el('line',{x1:ox+v*scale,y1:oy,x2:ox+v*scale,y2:40,stroke:'#eee9dd','stroke-width':1});
-    el('line',{x1:ox,y1:oy-v*scale,x2:360,y2:oy-v*scale,stroke:'#eee9dd','stroke-width':1});
+  el('rect',{x:bx,y:40,width:160,height:160,fill:'rgba(184,145,47,.07)'});
+  el('rect',{x:40,y:40,width:160,height:160,fill:'rgba(107,76,154,.07)'});
+  el('rect',{x:40,y:by,width:160,height:160,fill:'rgba(120,114,144,.08)'});
+  el('rect',{x:bx,y:by,width:160,height:160,fill:'rgba(184,145,47,.04)'});
+  [-40,-20,0,20,40].forEach(v=>{
+    const x=bx+v*scale, y=by-v*scale;
+    el('line',{x1:x,y1:40,x2:x,y2:360,stroke:'#eee9dd','stroke-width':1});
+    el('line',{x1:40,y1:y,x2:360,y2:y,stroke:'#eee9dd','stroke-width':1});
+    el('text',{x:x,y:376,fill:'#8a8496','font-size':9,'text-anchor':'middle'},String(v));
+    if(v!==0) el('text',{x:28,y:y+3,fill:'#8a8496','font-size':9,'text-anchor':'middle'},String(v));
   });
 
-  el('line',{x1:ox,y1:oy,x2:380,y2:oy,stroke:'#c9c2b2','stroke-width':1.2});
-  el('line',{x1:ox,y1:oy,x2:ox,y2:20,stroke:'#c9c2b2','stroke-width':1.2});
-  el('polygon',{points:'380,360 372,356 372,364',fill:'#c9c2b2'});
-  el('polygon',{points:'40,20 36,28 44,28',fill:'#c9c2b2'});
+  el('line',{x1:40,y1:by,x2:380,y2:by,stroke:'#c9c2b2','stroke-width':1.2});
+  el('line',{x1:bx,y1:360,x2:bx,y2:20,stroke:'#c9c2b2','stroke-width':1.2});
+  el('polygon',{points:'380,200 372,196 372,204',fill:'#c9c2b2'});
+  el('polygon',{points:'200,20 196,28 204,28',fill:'#c9c2b2'});
   el('text',{x:370,y:382,fill:'#b8912f','font-size':14,'font-family':'Georgia,serif','text-anchor':'end'},'Re (Я)');
-  el('text',{x:52,y:32,fill:'#6b4c9a','font-size':14,'font-family':'Georgia,serif'},'Im (Мы)');
+  el('text',{x:210,y:32,fill:'#6b4c9a','font-size':14,'font-family':'Georgia,serif'},'Im (Мы)');
 
-  el('line',{x1:bx,y1:40,x2:bx,y2:360,stroke:'#241f38','stroke-width':.8,'stroke-dasharray':'3 4',opacity:.3});
-  el('line',{x1:40,y1:by,x2:360,y2:by,stroke:'#241f38','stroke-width':.8,'stroke-dasharray':'3 4',opacity:.3});
-  el('text',{x:bx+6,y:by-6,fill:'#7a7290','font-size':10,'font-family':'Georgia,serif'},'баланс (40, 40)');
+  el('text',{x:bx+6,y:by-6,fill:'#7a7290','font-size':10,'font-family':'Georgia,serif'},'баланс (0, 0)');
 
   el('text',{x:280,y:70,fill:'#b8912f','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'I · Ядро');
   el('text',{x:120,y:70,fill:'#6b4c9a','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'II · Резонанс');
   el('text',{x:120,y:340,fill:'#7a7290','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'III · Кокон');
   el('text',{x:280,y:340,fill:'#b8912f','font-size':12,'font-family':'Georgia,serif','text-anchor':'middle'},'IV · Ось');
 
-  const dx = Ya - 40, dy = My - 40;
+  const dx = Ya, dy = My;
   if(Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01){
     const rb = 38;
     const sx = bx + rb, sy = by;
@@ -1528,8 +1531,8 @@ function drawPlane(Ya, My, phi){
   el('circle',{cx:px,cy:py,r:8,fill:'#241f38'});
   el('circle',{cx:px,cy:py,r:3.5,fill:'#fff'});
   el('text',{x:px+13,y:py-9,fill:'#241f38','font-size':16,'font-family':'Georgia,serif','font-style':'italic'},'z');
-  el('text',{x:px,y:oy+18,fill:'#b8912f','font-size':11,'font-family':'Georgia,serif','text-anchor':'middle'},'Я='+Ya);
-  el('text',{x:ox-8,y:py+4,fill:'#6b4c9a','font-size':11,'font-family':'Georgia,serif','text-anchor':'end'},'Мы='+My);
+  el('text',{x:px,y:by+18,fill:'#b8912f','font-size':11,'font-family':'Georgia,serif','text-anchor':'middle'},'Я='+fmt1(Ya));
+  el('text',{x:bx-8,y:py+4,fill:'#6b4c9a','font-size':11,'font-family':'Georgia,serif','text-anchor':'end'},'Мы='+fmt1(My));
 }
 
 function renderVectorBars(s){
@@ -1538,24 +1541,27 @@ function renderVectorBars(s){
   const sorted = [...VECTORS].sort((a,b)=> s[b.id]-s[a.id]);
   sorted.forEach(v=>{
     const row = document.createElement('div');
-    row.className = 'vec-row' + (s[v.id] >= 12 ? ' top' : '');
+    row.className = 'vec-row' + (s[v.id] >= 2 ? ' top' : '');
     const cls = v.half==='ya' ? 're' : 'im';
-    row.innerHTML = '<div class="name">'+v.name+'</div><div class="track"><div class="fill '+cls+'" data-w="'+(s[v.id]/20*100)+'"></div></div><div class="score">'+s[v.id]+'/20</div>';
+    const val=s[v.id], left=val<0 ? 50+val/20*100 : 50, width=Math.abs(val)/20*100;
+    row.innerHTML = '<div class="name">'+v.name+'</div><div class="track signed"><div class="fill '+cls+'" data-left="'+left+'" data-w="'+width+'"></div></div><div class="score">'+fmt1(val)+'/10</div>';
     wrap.appendChild(row);
   });
-  const top = sorted.slice(0,3);
-  const weak = sorted.slice(-2).filter(v=> s[v.id] <= 6);
+  const top = sorted.filter(v=>s[v.id]>=2).slice(0,3);
+  const weak = sorted.slice(-2).filter(v=> s[v.id] <= -4);
   const detail = document.getElementById('vecDetail');
   let html = '<b>Ведущие векторы:</b><br>';
-  top.forEach(v=>{ html += '• <b>'+v.name+'</b> ('+s[v.id]+'/20) — '+DESC[v.id].hi+'<br>'; });
+  top.forEach(v=>{ html += '• <b>'+v.name+'</b> ('+s[v.id]+'/10) — '+DESC[v.id].hi+'<br>'; });
   if(weak.length){
     html += '<br><b>Наименее выражены:</b><br>';
-    weak.forEach(v=>{ html += '• <b>'+v.name+'</b> ('+s[v.id]+'/20) — '+DESC[v.id].lo+'<br>'; });
+    weak.forEach(v=>{ html += '• <b>'+v.name+'</b> ('+s[v.id]+'/10) — '+DESC[v.id].lo+'<br>'; });
   }
   detail.innerHTML = html;
 }
 function animateBars(){
-  document.querySelectorAll('#vectorBars .fill').forEach(f=>{ f.style.width = f.dataset.w + '%'; });
+  document.querySelectorAll('#vectorBars .fill').forEach(f=>{
+    f.style.left = f.dataset.left + '%'; f.style.width = f.dataset.w + '%';
+  });
 }
 
 function renderDiagnosis(s, sum, quad, isOther){
@@ -1571,20 +1577,20 @@ function renderDiagnosis(s, sum, quad, isOther){
         + '<b>Квадрант «'+q.name+'» ('+q.coords+').</b> '+q.tagline+'. ' + q.verdict.replace(/<[^>]+>/g,'') + '</p>';
 
   if(sum.modPct >= 70){
-    html += '<p><b>|z| = '+sum.modPct+'% — высокий энергетический уровень.</b> ' + subjWord + ' — яркая, мощная личность с выраженной проявленностью по обеим осям.</p>';
+    html += '<p><b>|z| = '+sum.modPct+'% — сильное отклонение от нейтральной точки.</b> ' + subjWord + ' имеет выраженный профиль по обеим осям.</p>';
   } else if(sum.modPct >= 45){
-    html += '<p><b>|z| = '+sum.modPct+'% — умеренный энергетический уровень.</b> Достаточный ресурс, но без крайностей.</p>';
+    html += '<p><b>|z| = '+sum.modPct+'% — умеренное отклонение от нейтральной точки.</b></p>';
   } else {
-    html += '<p><b>|z| = '+sum.modPct+'% — невысокий энергетический уровень.</b> Проявленность сдержанна, многое остаётся во внутреннем плане.</p>';
+    html += '<p><b>|z| = '+sum.modPct+'% — профиль близок к нейтральной точке.</b></p>';
   }
 
-  html += '<p><b>Угол φ от баланса (40, 40) = ' + fmtAngle(sum.phi) + '°.</b> ' +
+  html += '<p><b>Угол φ от баланса (0, 0) = ' + fmtAngle(sum.phi) + '°.</b> ' +
           'Сектор <b>«' + sector.name + '»</b> (' + sector.range + '). ' +
           sector.tagline + ' ' + sector.detail + '</p>';
 
   html += '<p><b>Расстояние от баланса d = ' + fmt1(sum.dev) + '.</b> ' + distLvl.name + '. ' + distLvl.desc + '</p>';
 
-  html += '<p><b>Ведущая роль:</b> '+dom.name+' ('+s[dom.id]+'/20), поддерживающая — '+second.name+' ('+s[second.id]+'/20). Это ядро личности по модели.</p>';
+  html += '<p><b>Наиболее выражены:</b> '+dom.name+' ('+s[dom.id]+'/10) и '+second.name+' ('+s[second.id]+'/10).</p>';
 
   const dyn = sum.Save - sum.Change;
   if(Math.abs(dyn) <= 10) html += '<p><b>Динамический баланс.</b> Устойчивость и изменение — соразмерны.</p>';
@@ -1603,8 +1609,8 @@ function renderDiagnosis(s, sum, quad, isOther){
   };
   add('Квадрант '+q.roman+': '+q.name, '');
   add('Сектор: '+sector.name, 'p');
-  add('Я: '+sum.Ya+'/80', 'p');
-  add('Мы: '+sum.My+'/80', 'g');
+  add('Я: '+fmt1(sum.Ya)+'/40', 'p');
+  add('Мы: '+fmt1(sum.My)+'/40', 'g');
   add('|z|: '+sum.modPct+'%', '');
   add('φ: '+fmtAngle(sum.phi)+'°', 'p');
   add('d: '+fmt1(sum.dev), 'g');
@@ -1637,8 +1643,8 @@ function renderTypology(){
   const marker = document.getElementById('typoUserMarker');
   if(userQuadrant){
     const sum = summaryFromScores(computeScores());
-    const px = 200 + (sum.Ya - 40) * 4;
-    const py = 200 - (sum.My - 40) * 4;
+    const px = 200 + sum.Ya * (160/40);
+    const py = 200 - sum.My * (160/40);
     marker.setAttribute('transform', 'translate('+px+','+py+')');
     marker.style.display = '';
   } else {
@@ -1758,7 +1764,7 @@ function renderSubjectView(subj){
     content.insertAdjacentHTML('beforeend',
       '<div class="res-hero">' +
         '<div class="eyebrow subject-view">' + aggLabel + '</div>' +
-        '<div class="z-display"><span class="re">' + displaySum.Ya + '</span> + <span class="im">i · ' + displaySum.My + '</span></div>' +
+        '<div class="z-display"><span class="re">' + fmt1(displaySum.Ya) + '</span> ' + (displaySum.My < 0 ? '−' : '+') + ' <span class="im">i · ' + fmt1(Math.abs(displaySum.My)) + '</span></div>' +
         '<div class="z-numbers">' +
           '<span class="big">|z| = ' + Math.round(displaySum.mod) + '</span> <span class="lbl">(' + displaySum.modPct + '%)</span><br>' +
           '<span class="lbl">φ от баланса:</span> <span class="phi-bal">' + fmtAngle(displaySum.phi) + '°</span>' +
@@ -1836,7 +1842,7 @@ function renderSubjectView(subj){
               '<div style="font-size:12px;color:#a09aae;">' + date + '</div>' +
             '</div>' +
             '<div style="margin-top:8px;font-size:13.5px;color:#4a4460;">' +
-              'z = <b style="color:var(--gold);">' + sum.Ya + '</b> + i·<b style="color:var(--purple);">' + sum.My + '</b>' +
+              'z = <b style="color:var(--gold);">' + fmt1(sum.Ya) + '</b> ' + (sum.My < 0 ? '−' : '+') + ' i·<b style="color:var(--purple);">' + fmt1(Math.abs(sum.My)) + '</b>' +
               ' · Квадрант <b>' + q.roman + ' · ' + q.name + '</b>' +
               ' · Сектор <b>' + sector.name + '</b>' +
               ' · φ = ' + fmtAngle(sum.phi) + '°' +
@@ -1866,7 +1872,7 @@ function renderAnglePanelInto(containerId, sum){
     '<div class="ap-head">' +
       '<div class="ap-compass"><svg viewBox="0 0 200 200" id="' + compassId + '"></svg></div>' +
       '<div class="ap-meta">' +
-        '<div class="ap-eyebrow">Угол от точки баланса (40, 40)</div>' +
+        '<div class="ap-eyebrow">Угол от точки баланса (0, 0)</div>' +
         '<div class="ap-angle"><span class="ap-phi">' + phiStr + '</span> <span class="ap-d">· d = ' + fmt1(sum.dev) + '</span></div>' +
         '<div class="ap-sector ' + paletteCls + '">' + sector.name + '</div>' +
         '<div class="ap-range">' + sector.range + ' · ' + sector.short + '</div>' +
@@ -1901,15 +1907,20 @@ function renderCompareBars(selfScores, avgOthers){
     const row = document.createElement('div');
     row.className = 'vec-row dual';
     const cls = v.half === 'ya' ? 're' : 'im';
+    const selfLeft=selfV<0 ? 50+selfV/20*100 : 50, selfWidth=Math.abs(selfV)/20*100;
+    const otherLeft=othersV<0 ? 50+othersV/20*100 : 50, otherWidth=Math.abs(othersV)/20*100;
     row.innerHTML =
       '<div class="name">' + v.name + '</div>' +
-      '<div class="track">' +
-        '<div class="layer self"><div class="fill ' + cls + '" data-w="' + (selfV/20*100) + '"></div></div>' +
-        '<div class="layer others"><div class="fill ' + cls + '" data-w="' + (othersV/20*100) + '"></div></div>' +
+      '<div class="track signed">' +
+        '<div class="layer self"><div class="fill ' + cls + '" data-left="'+selfLeft+'" data-w="' + selfWidth + '"></div></div>' +
+        '<div class="layer others"><div class="fill ' + cls + '" data-left="'+otherLeft+'" data-w="' + otherWidth + '"></div></div>' +
       '</div>' +
       '<div class="score">' + fmt1(othersV) + '</div>';
     wrap.appendChild(row);
   });
+  requestAnimationFrame(()=>wrap.querySelectorAll('.fill').forEach(f=>{
+    f.style.left=f.dataset.left+'%'; f.style.width=f.dataset.w+'%';
+  }));
 }
 function renderBlindSummary(selfScores, avgOthers){
   const wrap = document.getElementById('svBlindSummary');
@@ -1936,7 +1947,7 @@ function renderBlindSummary(selfScores, avgOthers){
       html += '<div class="bs-item under"><b>' + it.v.name + '.</b> Окружающие видят на <b>+' + Math.abs(d) + '</b> балла <b>больше</b>, чем автор (' + fmt1(it.othersV) + ' vs ' + it.selfV + '). Зона недооценки.</div>';
     }
   });
-  html += '<div class="bs-item agree" style="margin-top:10px;"><b>Важно.</b> Значимой считаем разницу от ' + THR + ' баллов (из 20).</div>';
+  html += '<div class="bs-item agree" style="margin-top:10px;"><b>Важно.</b> Значимой считаем разницу от ' + THR + ' баллов по шкале −10…+10.</div>';
   wrap.innerHTML = html;
 }
 function renderSingleBars(scores){
@@ -1945,18 +1956,19 @@ function renderSingleBars(scores){
   const sorted = [...VECTORS].sort((a,b)=> scores[b.id]-scores[a.id]);
   sorted.forEach(v=>{
     const row = document.createElement('div');
-    row.className = 'vec-row' + (scores[v.id] >= 12 ? ' top' : '');
+    row.className = 'vec-row' + (scores[v.id] >= 2 ? ' top' : '');
     const cls = v.half==='ya' ? 're' : 'im';
-    row.innerHTML = '<div class="name">'+v.name+'</div><div class="track"><div class="fill '+cls+'" style="width:' + (scores[v.id]/20*100) + '%"></div></div><div class="score">'+ fmt1(scores[v.id]) +'/20</div>';
+    const val=scores[v.id], left=val<0 ? 50+val/20*100 : 50, width=Math.abs(val)/20*100;
+    row.innerHTML = '<div class="name">'+v.name+'</div><div class="track signed"><div class="fill '+cls+'" style="left:'+left+'%;width:'+width+'%"></div></div><div class="score">'+ fmt1(val) +'/10</div>';
     wrap.appendChild(row);
   });
-  const top = sorted.slice(0,3);
-  const weak = sorted.slice(-2).filter(v=> scores[v.id] <= 6);
+  const top = sorted.filter(v=>scores[v.id]>=2).slice(0,3);
+  const weak = sorted.slice(-2).filter(v=> scores[v.id] <= -4);
   let html = '<b>Ведущие векторы:</b><br>';
-  top.forEach(v=>{ html += '• <b>'+v.name+'</b> (' + fmt1(scores[v.id]) + '/20) — '+DESC[v.id].hi+'<br>'; });
+  top.forEach(v=>{ html += '• <b>'+v.name+'</b> (' + fmt1(scores[v.id]) + '/10) — '+DESC[v.id].hi+'<br>'; });
   if(weak.length){
     html += '<br><b>Наименее выражены:</b><br>';
-    weak.forEach(v=>{ html += '• <b>'+v.name+'</b> (' + fmt1(scores[v.id]) + '/20) — '+DESC[v.id].lo+'<br>'; });
+    weak.forEach(v=>{ html += '• <b>'+v.name+'</b> (' + fmt1(scores[v.id]) + '/10) — '+DESC[v.id].lo+'<br>'; });
   }
   document.getElementById('svSingleDetail').innerHTML = html;
 }
@@ -1970,7 +1982,7 @@ async function deleteCurrentSubject(){
 }
 
 function printResult(){
-  document.querySelectorAll('#vectorBars .fill').forEach(f=>{ f.style.width = f.dataset.w + '%'; });
+  document.querySelectorAll('#vectorBars .fill').forEach(f=>{ f.style.left=f.dataset.left+'%'; f.style.width = f.dataset.w + '%'; });
   document.getElementById('results').classList.add('print-target');
   document.getElementById('subjectView').classList.remove('print-target');
   requestAnimationFrame(()=>{ setTimeout(()=> {
@@ -1979,7 +1991,7 @@ function printResult(){
   }, 60); });
 }
 function printSubject(){
-  document.querySelectorAll('#svCompareBars .fill').forEach(f=>{ if(f.dataset.w) f.style.width = f.dataset.w + '%'; });
+  document.querySelectorAll('#svCompareBars .fill').forEach(f=>{ if(f.dataset.w){f.style.left=f.dataset.left+'%'; f.style.width=f.dataset.w+'%';} });
   document.getElementById('subjectView').classList.add('print-target');
   document.getElementById('results').classList.remove('print-target');
   requestAnimationFrame(()=>{ setTimeout(()=> {
@@ -2008,12 +2020,12 @@ function copyResult(){
   txt += 'Угловой сектор: ' + sector.name + ' (' + sector.range + ')\n';
   txt += 'Направление: ' + sector.dir + '\n';
   txt += 'Сила отклонения: ' + distLvl.name + '\n\n';
-  txt += 'z = ' + sum.Ya + ' + i·' + sum.My + '\n';
+  txt += 'z = ' + fmt1(sum.Ya) + (sum.My < 0 ? ' − i·' : ' + i·') + fmt1(Math.abs(sum.My)) + '\n';
   txt += '|z| = ' + Math.round(sum.mod) + ' (' + sum.modPct + '%)\n';
-  txt += 'φ от баланса (40, 40) = ' + fmtAngle(sum.phi) + '°\n';
+  txt += 'φ от баланса (0, 0) = ' + fmtAngle(sum.phi) + '°\n';
   txt += 'd — расстояние от баланса = ' + fmt1(sum.dev) + '\n\n';
   txt += 'Профиль векторов:\n';
-  sorted.forEach(v=>{ txt += '  ' + v.name.padEnd(14,' ') + ' ' + sum.s[v.id] + '/20\n'; });
+  sorted.forEach(v=>{ txt += '  ' + v.name.padEnd(14,' ') + ' ' + sum.s[v.id] + '/10\n'; });
   txt += '\nЯ  = ан(' + sum.s.an + ') + ур(' + sum.s.ur + ') + зв(' + sum.s.zv + ') + об(' + sum.s.ob + ') = ' + sum.Ya + '\n';
   txt += 'Мы = мыш(' + sum.s.mysh + ') + кож(' + sum.s.kozh + ') + ор(' + sum.s.or + ') + зр(' + sum.s.zr + ') = ' + sum.My + '\n\n';
   txt += '© В. Лещинский, октябрь 2006. Модель «Я/Мы».\n';
@@ -2039,9 +2051,9 @@ const ADMIN_VECTORS = [
   ['mysh','Мыш'], ['kozh','Кож'], ['or','Ор'], ['zr','Зр'],
   ['an','Ан'], ['ur','Ур'], ['zv','Зв'], ['ob','Об']
 ];
-function isAdminPath(){ return /\/admin\/?$/.test(location.pathname); }
+function isAdminPath(){ return /\/v2\/admin\/?$/.test(location.pathname); }
 function openAdmin(fromPop){
-  if(!fromPop && !isAdminPath()) history.pushState({view:'admin'}, '', (BASE || '') + '/admin');
+  if(!fromPop && !isAdminPath()) history.pushState({view:'admin'}, '', (BASE || '') + '/v2/admin');
   show('admin');
   refreshAdmin();
 }
@@ -2052,8 +2064,8 @@ function showAdminLogin(){
 function showAdminPanel(email){
   document.getElementById('adminLogin').style.display = 'none';
   document.getElementById('adminPanel').style.display = '';
-  document.getElementById('adminExport').href = BASE + '/api/admin/export.csv';
-  document.getElementById('adminExportLinks').href = BASE + '/api/admin/export-links.csv';
+  document.getElementById('adminExport').href = BASE + '/api/admin/export-v2.csv';
+  document.getElementById('adminExportLinks').href = BASE + '/api/admin/export-links-v2.csv';
   document.getElementById('adminMeta').textContent = 'Сессия: ' + email;
 }
 async function refreshAdmin(){
@@ -2062,8 +2074,8 @@ async function refreshAdmin(){
     const me = await api('GET', BASE + '/api/admin/me');
     showAdminPanel(me.email);
     const data = await api('GET', BASE + '/api/admin/data');
-    const rows = data.rows || [];
-    const links = data.links || [];
+    const rows = data.rows_v2 || [];
+    const links = data.links_v2 || [];
     const meta = document.getElementById('adminMeta');
     meta.textContent = meta.textContent + ' · личностей: ' + rows.filter(r => r.response_id != null).length + ' · связей: ' + links.length;
     renderAdminTable(rows);
@@ -2147,8 +2159,8 @@ window.addEventListener('popstate', () => {
   else show('intro');
 });
 
-document.getElementById('navLinksBtn').href = (BASE || '') + '/links';
-document.getElementById('navV2Btn').href = (BASE || '') + '/v2/';
+document.getElementById('navLinksBtn').href = (BASE || '') + '/v2/links';
+document.getElementById('navV1Btn').href = (BASE || '') + '/';
 
 if(isAdminPath()) openAdmin(true);
 else updateProfileCount();

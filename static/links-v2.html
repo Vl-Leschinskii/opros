@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Связь — опросник матрицы общения</title>
+<title>Связь v2 — подписанный сдвиг и задержка</title>
 <style>
   :root{
     --bg:#f7f4ee; --card:#ffffff; --ink:#241f38; --muted:#7a7290;
@@ -121,20 +121,20 @@
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand">Матрица связи</div>
+    <div class="brand">Матрица связи · v2</div>
     <h1>Общение <span class="amp">/</span> комплексные элементы</h1>
     <nav class="main-nav">
       <a class="nav-btn" id="navHome" href="/">Главная</a>
       <button class="nav-btn active" id="navLinks" type="button" onclick="show('intro')">Связь</button>
       <button class="nav-btn" id="navMine" type="button" onclick="showLinks()">Мои связи <span id="linkCount"></span></button>
-      <a class="nav-btn" id="navV2" href="/v2/links">Версия 2</a>
+      <a class="nav-btn" id="navV1" href="/links">Версия 1</a>
     </nav>
   </header>
 
   <section id="intro" class="active">
     <div class="intro-card">
       <div class="formula"><span class="re">A</span> = |A| · <span class="im">e<sup>iφ</sup></span></div>
-      <div class="formula-sub">сила сигнала · фаза отклика</div>
+      <div class="formula-sub">подписанный сдвиг · задержка отклика</div>
       <p class="intro-lead">Оцените общение с одним человеком — в семье или на работе. Из ответов собираются комплексные элементы матрицы связи в обе стороны.</p>
       <div class="mode-grid">
         <button class="mode-card" type="button" onclick="chooseContext('family')">
@@ -149,7 +149,7 @@
         </button>
       </div>
       <div class="scale-note">
-        <b>Три канала.</b> Эмоция, ресурс и цель. На каждую пару каналов два вопроса: насколько сильно один сдвигает другой и с какой фазой — сразу или с задержкой, в ту же сторону или в противоположную.
+        <b>Три канала.</b> Эмоция, ресурс и цель. На каждую пару каналов два вопроса: следует ли реакция изменению источника или противодействует ему, и с какой задержкой она возникает.
         <ul>
           <li>Влияние направлено: «я → он» и «он → я» спрашиваются отдельно.</li>
           <li>Связь с самим собой не оценивается.</li>
@@ -185,12 +185,12 @@
             <li><b>Цель → ресурс.</b> Когда один называет или меняет свою цель, у другого поднимаются или опускаются дела в очереди и меняется доля, которую тот ещё берёт.</li>
             <li><b>Цель → цель.</b> Цель одного вызывает у другого цель в лад с ней — или цель, которая ей мешает.</li>
           </ul>
-          <p>Сила — насколько сдвиг заметен. Фаза — в ту же сторону или в противоположную, сразу или с задержкой. Для цели «в ту же сторону» значит: цель адресата появляется или уточняется в лад с целями влияющего; «в противоположную» — возникает цель, которая целям источника мешает. «Я → он» и «он → я» — два разных влияния: они не обязаны совпадать.</p>
+          <p>Знак показывает, согласована ли реакция с изменением источника или противодействует ему. Для цели положительный знак означает цель в лад с целями влияющего, отрицательный — цель, которая им мешает. Модуль показывает выраженность, угол — только задержку от 0° до 90°. «Я → он» и «он → я» независимы.</p>
         </div>
       </div>
       <div class="citation">
         <span class="cit-author">В. Лещинский</span><br>
-        Оценка по модели «Динамика открытых систем на ориентированных графах»: амплитуда и фаза канала влияния. Это не измеренный спектр коллектива.
+        Версия 2: центрированный подписанный сдвиг и задержка. Это оценка по модели, не измеренный спектр коллектива.
       </div>
     </div>
   </section>
@@ -217,7 +217,7 @@
       <span id="qPct">0%</span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-    <div id="quizBadge" class="quiz-mode-badge">я → он · сила</div>
+    <div id="quizBadge" class="quiz-mode-badge">я → он · знак</div>
     <div class="q-card" id="qCard">
       <div class="q-num" id="qNum">01 / 36</div>
       <div class="q-text" id="qText">…</div>
@@ -242,7 +242,7 @@
       <p class="gl-lead">Строка — канал источника, столбец — канал адресата.</p>
       <div class="gl-item">
         <div class="gl-name"><span class="re">Эмоция</span> — настроение и чувства. <span class="im">Ресурс</span> — очередь своего времени: что ставят раньше и какую долю ещё берут. Цель — цель адресата относительно целей влияющего: появляется или уточняется в лад с ними, либо встаёт им поперёк.</div>
-        <p style="margin-top:8px">Диагональ (эмоция→эмоция, ресурс→ресурс, цель→цель) — тот же слой у обоих. Остальные клетки — сдвиг переходит в другой слой: чувства меняют очередь дел и долю, которую человек ещё берёт, и вызывают цель относительно целей другого; названная цель меняет настроение. Для цели фаза «в ту же сторону» — цель появляется или уточняется в лад, «в противоположную» — цель, которая мешает целям источника. Сила клетки — насколько сдвиг заметен, фаза — сразу или с задержкой.</p>
+        <p style="margin-top:8px">Положительный элемент — реакция следует изменению источника, отрицательный — противодействует. Модуль равен 1,33 для умеренного и 2 для сильного сдвига. Угол 0°…90° показывает только задержку.</p>
       </div>
     </div>
     <div class="res-actions">
@@ -250,7 +250,7 @@
       <button class="btn ghost" type="button" onclick="show('intro')">Новая связь</button>
       <button class="btn danger" id="deleteBtn" type="button" onclick="deleteCurrent()">Удалить</button>
     </div>
-    <div class="foot-note">Модель: «Динамика открытых систем на ориентированных графах», В. Лещинский. Амплитуда — сила сигнала, фаза — ритм отклика. Середина шкалы |A| = 2 принята за единицу 2-цикла.</div>
+    <div class="foot-note">Версия 2. A = x·e<sup>iθ</sup>: x — подписанный сдвиг, θ — задержка. Умеренный модуль |A| = 4/3 принят за единицу 2-цикла.</div>
   </section>
 
   <section id="list">
@@ -267,21 +267,21 @@
 <div class="toast" id="toast"></div>
 <script>
 const BASE = (location.pathname === '/opros' || location.pathname.startsWith('/opros/')) ? '/opros' : '';
-document.getElementById('navHome').href = (BASE || '') + '/';
-document.getElementById('navV2').href = (BASE || '') + '/v2/links';
+document.getElementById('navHome').href = (BASE || '') + '/v2/';
+document.getElementById('navV1').href = (BASE || '') + '/links';
 
 const CH = [
   {
     short:'эмоция',
     family:{
-      outSrc:'я говорю о своих чувствах',
-      inSrc:'он(а) говорит о своих чувствах',
+      outSrc:'моё настроение меняется',
+      inSrc:'его(её) настроение меняется',
       outDst:'его(её) настроение',
       inDst:'моё настроение'
     },
     work:{
-      outSrc:'я показываю своё отношение к делу',
-      inSrc:'он(а) показывает своё отношение к делу',
+      outSrc:'мой настрой к делу меняется',
+      inSrc:'его(её) настрой к делу меняется',
       outDst:'его(её) настрой к работе',
       inDst:'мой настрой к работе'
     }
@@ -317,14 +317,23 @@ const CH = [
     }
   }
 ];
-const STRENGTH = ['никак','едва','отчасти','заметно','очень сильно'];
-const PHASE = [
-  'сразу и в ту же сторону',
-  'в ту же сторону, но с задержкой',
-  'ритм почти не читается',
-  'в противоположную сторону, с задержкой',
-  'сразу в противоположную сторону'
+const SIGNED = [
+  '−2 · сильно противодействует изменению источника',
+  '−1,33 · скорее противодействует изменению источника',
+  '0 · устойчивого сдвига нет',
+  '+1,33 · скорее следует изменению источника',
+  '+2 · сильно следует изменению источника'
 ];
+const DELAY = [
+  '0° · сразу',
+  '22,5° · почти сразу',
+  '45° · с умеренной задержкой',
+  '67,5° · с заметной задержкой',
+  '90° · с большой задержкой'
+];
+const SCORE_MAP = [-2,-4/3,0,4/3,2];
+const CYCLE_UNIT = 4/3;
+const DELAY_DEG = [0,22.5,45,67.5,90];
 const N = 36;
 
 let context = 'family';
@@ -347,12 +356,12 @@ function questions(){
         const src = CH[row][pack][srcKey];
         const dst = CH[col][pack][dstKey];
         list.push({
-          direction, row, col, kind:'strength',
-          text:'Когда ' + src + ', насколько меняется ' + dst + '?'
+          direction, row, col, kind:'signed',
+          text:'Когда ' + src + ', как относительно этого сдвигается ' + dst + '?'
         });
         list.push({
-          direction, row, col, kind:'phase',
-          text:'Когда ' + src + ', и от этого меняется ' + dst + ' — как именно идёт этот сдвиг?'
+          direction, row, col, kind:'delay',
+          text:'Если при этом меняется ' + dst + ', с какой задержкой возникает реакция?'
         });
       }
     }
@@ -400,7 +409,7 @@ function escapeHtml(s){
 async function updateCount(){
   let label = '';
   try {
-    const data = await api('GET', BASE + '/api/links');
+    const data = await api('GET', BASE + '/api/v2/links');
     label = data.links.length ? '(' + data.links.length + ')' : '';
   } catch(e){}
   document.getElementById('linkCount').textContent = label;
@@ -442,13 +451,13 @@ function renderQuestion(){
   locked = false;
   const q = questions()[current];
   const dir = q.direction === 'out' ? 'я → он(а)' : 'он(а) → я';
-  const kind = q.kind === 'strength' ? 'сила' : 'фаза';
+  const kind = q.kind === 'signed' ? 'знак и выраженность' : 'задержка';
   document.getElementById('qNum').textContent = String(current+1).padStart(2,'0') + ' / ' + N + ' · ' + CH[q.row].short + ' → ' + CH[q.col].short;
   document.getElementById('qText').textContent = q.text;
   const badge = document.getElementById('quizBadge');
   badge.textContent = (context === 'work' ? 'Работа' : 'Семья') + ' · ' + selfName + ' · ' + dir + ' · ' + kind;
   badge.className = 'quiz-mode-badge' + (q.direction === 'in' ? ' in' : '');
-  const labels = q.kind === 'strength' ? STRENGTH : PHASE;
+  const labels = q.kind === 'signed' ? SIGNED : DELAY;
   const box = document.getElementById('qOptions');
   box.innerHTML = '';
   labels.forEach((label, i) => {
@@ -487,12 +496,11 @@ document.addEventListener('keydown', e => {
   if(e.key === 'Backspace' || e.key === 'ArrowLeft'){ e.preventDefault(); prevQuestion(); }
 });
 
-function cellOf(strength, phase){
-  if(strength === 0 || phase === 2) return {re:0, im:0};
-  if(phase === 0) return {re:strength, im:0};
-  if(phase === 1) return {re:0, im:strength};
-  if(phase === 3) return {re:0, im:-strength};
-  return {re:-strength, im:0};
+function cellOf(answerIndex, delayIndex){
+  const signed = SCORE_MAP[answerIndex];
+  if(Math.abs(signed) < 1e-12) return {re:0, im:0};
+  const angle = DELAY_DEG[delayIndex] * Math.PI / 180;
+  return {re:signed*Math.cos(angle), im:signed*Math.sin(angle)};
 }
 function matrixOf(direction){
   const base = direction * 18;
@@ -542,7 +550,7 @@ function spectralRadius(matrix){
 function localModel(){
   const matrix_out = matrixOf(0);
   const matrix_in = matrixOf(1);
-  const radius = spectralRadius(matmul(scaleMatrix(matrix_out, 0.5), scaleMatrix(matrix_in, 0.5)));
+  const radius = spectralRadius(matmul(scaleMatrix(matrix_out, 1/CYCLE_UNIT), scaleMatrix(matrix_in, 1/CYCLE_UNIT)));
   return {context, self_name:selfName, partner_name:partnerName, matrix_out, matrix_in, radius};
 }
 
@@ -590,7 +598,7 @@ function renderReadings(model){
     const value = amp(cell);
     if(!gap || value > gap.amp) gap = {row:r, col:c, amp:value, cell};
   }));
-  const who = gap && gap.amp >= 0.5
+  const who = gap && gap.amp >= 0.25
     ? 'Сильнее всего расходятся «' + CH[gap.row].short + ' → ' + CH[gap.col].short + '»: разность ' + fmt(gap.cell.re) + (gap.cell.im < 0 ? ' − ' : ' + ') + fmt(Math.abs(gap.cell.im)) + 'i. Влияние по этому каналу течёт не одинаково в обе стороны.'
     : 'По каналам влияние близко к взаимному: клетки двух направлений почти совпадают.';
   const rho = model.radius;
@@ -618,7 +626,7 @@ function renderResult(model, opts){
     '<div class="panel"><h3>Я → он(а)</h3><p class="profiles-desc">Строка — что меняется у меня, столбец — что сдвигается у него(неё).</p>' + matrixTable(model.matrix_out) + '</div>' +
     '<div class="panel"><h3>Он(а) → я</h3><p class="profiles-desc">Строка — что меняется у него(неё), столбец — что сдвигается у меня.</p>' + matrixTable(model.matrix_in) + '</div>' +
     '<div class="panel"><h3>Невзаимность</h3><p class="profiles-desc">Разность клеток: (я → он) минус (он → я).</p>' + matrixTable(read.diff) + '<div class="verdict">' + read.who + '</div></div>' +
-    '<div class="panel"><h3>2-цикл</h3><div class="verdict">' + read.cycle + ' Сравнение с 1 сделано после деления каждой амплитуды на 2 — середину шкалы.</div></div>' +
+    '<div class="panel"><h3>2-цикл</h3><div class="verdict">' + read.cycle + ' Сравнение с 1 сделано после деления каждой амплитуды на 4/3 — умеренный ненулевой уровень.</div></div>' +
     '<div class="panel"><h3>Какой канал громче</h3><div class="verdict">' + read.loudText + '</div></div>';
   show('results');
 }
@@ -654,7 +662,7 @@ async function submitLink(overwrite){
   lastSave = {state:'saving', error:null};
   renderSavePanel();
   try {
-    const res = await api('POST', BASE + '/api/links', {
+    const res = await api('POST', BASE + '/api/v2/links', {
       context, self:selfName, partner:partnerName, answers:answers.slice(), overwrite: !!overwrite
     });
     currentId = res.id;
@@ -682,7 +690,7 @@ async function showLinks(){
   box.innerHTML = '<div class="empty-state">Загрузка…</div>';
   show('list');
   let links;
-  try { links = (await api('GET', BASE + '/api/links')).links; }
+  try { links = (await api('GET', BASE + '/api/v2/links')).links; }
   catch(e){
     box.innerHTML = '<div class="empty-state">' + escapeHtml(e.message) + '</div>';
     return;
@@ -705,7 +713,7 @@ async function showLinks(){
 }
 async function openLink(id){
   try {
-    const link = await api('GET', BASE + '/api/links/' + id);
+    const link = await api('GET', BASE + '/api/v2/links/' + id);
     currentId = link.id;
     selfName = link.self_name;
     partnerName = link.partner_name;
@@ -721,7 +729,7 @@ async function deleteCurrent(){
   if(!currentId) return;
   if(!confirm('Удалить эту связь из базы?')) return;
   try {
-    await api('DELETE', BASE + '/api/links/' + currentId);
+    await api('DELETE', BASE + '/api/v2/links/' + currentId);
     currentId = null;
     showToast('Связь удалена');
     showLinks();

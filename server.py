@@ -142,6 +142,54 @@ CREATE TABLE IF NOT EXISTS link_responses (
 
 CREATE UNIQUE INDEX IF NOT EXISTS link_one_pair
     ON link_responses(owner_hash, context, self_norm, partner_norm);
+
+-- Версия 2 хранится отдельно: ответы остаются индексами 0..4, производные
+-- значения имеют центрированную нелинейную шкалу и поэтому являются REAL.
+CREATE TABLE IF NOT EXISTS responses_v2 (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    author_id  INTEGER REFERENCES subjects(id),
+    mode       TEXT    NOT NULL CHECK (mode IN ('self', 'other')),
+    rater      TEXT    NOT NULL DEFAULT '',
+    answers    TEXT    NOT NULL,
+    s_mysh     REAL    NOT NULL,
+    s_kozh     REAL    NOT NULL,
+    s_or       REAL    NOT NULL,
+    s_zr       REAL    NOT NULL,
+    s_an       REAL    NOT NULL,
+    s_ur       REAL    NOT NULL,
+    s_zv       REAL    NOT NULL,
+    s_ob       REAL    NOT NULL,
+    ya         REAL    NOT NULL,
+    my         REAL    NOT NULL,
+    quadrant   TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS responses_v2_one_self
+    ON responses_v2(subject_id) WHERE mode = 'self';
+CREATE INDEX IF NOT EXISTS responses_v2_subject
+    ON responses_v2(subject_id, created_at);
+CREATE INDEX IF NOT EXISTS responses_v2_author
+    ON responses_v2(author_id);
+
+CREATE TABLE IF NOT EXISTS link_responses_v2 (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_hash    TEXT    NOT NULL,
+    context       TEXT    NOT NULL CHECK (context IN ('family', 'work')),
+    self_name     TEXT    NOT NULL,
+    self_norm     TEXT    NOT NULL,
+    partner_name  TEXT    NOT NULL,
+    partner_norm  TEXT    NOT NULL,
+    answers       TEXT    NOT NULL,
+    matrix_out    TEXT    NOT NULL,
+    matrix_in     TEXT    NOT NULL,
+    radius        REAL    NOT NULL,
+    created_at    INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS link_v2_one_pair
+    ON link_responses_v2(owner_hash, context, self_norm, partner_norm);
 """
 
 # author_id (responses) и owner_hash (subjects) добавляются миграциями:
@@ -251,6 +299,30 @@ def compute_scores(answers):
     elif u < 0 and v >= 0:
         quadrant = "II"
     elif u < 0 and v < 0:
+        quadrant = "III"
+    else:
+        quadrant = "IV"
+    return scores, ya, my, quadrant
+
+
+# Крайние ответы ±2, умеренные ±4/3. Двадцать пунктов оси тогда дают ±40.
+V2_SCORE_MAP = (-2.0, -4 / 3, 0.0, 4 / 3, 2.0)
+V2_DELAY_DEG = (0.0, 22.5, 45.0, 67.5, 90.0)
+V2_CYCLE_UNIT = 4 / 3
+
+
+def compute_scores_v2(answers):
+    raw = {vid: 0.0 for vid in VECTOR_IDS}
+    for idx, answer_index in enumerate(answers):
+        raw[VECTOR_IDS[idx % len(VECTOR_IDS)]] += V2_SCORE_MAP[answer_index]
+    scores = {key: round(value, 4) for key, value in raw.items()}
+    ya = round(sum(scores[v] for v in YA_VECTORS), 4)
+    my = round(sum(scores[v] for v in MY_VECTORS), 4)
+    if ya >= 0 and my >= 0:
+        quadrant = "I"
+    elif ya < 0 and my >= 0:
+        quadrant = "II"
+    elif ya < 0 and my < 0:
         quadrant = "III"
     else:
         quadrant = "IV"
@@ -467,6 +539,166 @@ def save_response(conn, payload, owner_hash):
         "author_id": author["id"],
         "subject_id": subject["id"],
         "subject": summary,
+    }
+
+
+# ----------------------------------------------------------------------------
+# Профиль v2: те же 40 пунктов, шкала -2, -4/3, 0, 4/3, 2
+# ----------------------------------------------------------------------------
+
+def response_v2_to_dict(row):
+    keys = row.keys()
+    author_name = row["author_name"] if "author_name" in keys and row["author_name"] else row["rater"]
+    return {
+        "id": row["id"],
+        "version": 2,
+        "author_id": row["author_id"],
+        "author_name": author_name or "",
+        "subject_id": row["subject_id"],
+        "rater": author_name or row["rater"] or "",
+        "answers": json.loads(row["answers"]),
+        "scores": {vid: row["s_" + vid] for vid in VECTOR_IDS},
+        "ya": row["ya"],
+        "my": row["my"],
+        "quadrant": row["quadrant"],
+        "ts": row["created_at"],
+    }
+
+
+def build_profile_v2(conn, subject):
+    rows = conn.execute(
+        """
+        SELECT r.*, a.name AS author_name
+          FROM responses_v2 r
+          LEFT JOIN subjects a ON a.id = r.author_id
+         WHERE r.subject_id = ?
+         ORDER BY r.created_at, r.id
+        """,
+        (subject["id"],),
+    ).fetchall()
+    profile = {
+        "id": subject["id"], "name": subject["name"], "version": 2,
+        "self": None, "others": [],
+    }
+    for row in rows:
+        item = response_v2_to_dict(row)
+        if row["mode"] == "self":
+            profile["self"] = item
+        else:
+            profile["others"].append(item)
+    return profile
+
+
+def subject_summary_v2(conn, subject):
+    row = conn.execute(
+        """
+        SELECT SUM(CASE WHEN mode = 'self'  THEN 1 ELSE 0 END) AS has_self,
+               SUM(CASE WHEN mode = 'other' THEN 1 ELSE 0 END) AS others_count
+          FROM responses_v2 WHERE subject_id = ?
+        """,
+        (subject["id"],),
+    ).fetchone()
+    return {
+        "id": subject["id"], "name": subject["name"], "version": 2,
+        "has_self": bool(row["has_self"]), "others_count": row["others_count"] or 0,
+    }
+
+
+def list_names_v2(conn):
+    rows = conn.execute(
+        """
+        SELECT s.name FROM subjects s
+         WHERE EXISTS (SELECT 1 FROM responses_v2 r WHERE r.subject_id = s.id)
+         ORDER BY s.name COLLATE NOCASE
+        """
+    ).fetchall()
+    return [row["name"] for row in rows]
+
+
+def list_subjects_v2(conn, owner_hash):
+    if not owner_hash:
+        return []
+    rows = conn.execute(
+        """
+        SELECT s.id, s.name,
+               SUM(CASE WHEN r.mode = 'self'  THEN 1 ELSE 0 END) AS has_self,
+               SUM(CASE WHEN r.mode = 'other' THEN 1 ELSE 0 END) AS others_count,
+               MAX(r.created_at) AS updated_at
+          FROM subjects s
+          LEFT JOIN responses_v2 r ON r.subject_id = s.id
+         WHERE s.owner_hash = ?
+         GROUP BY s.id
+        HAVING COUNT(r.id) > 0
+         ORDER BY s.name COLLATE NOCASE
+        """,
+        (owner_hash,),
+    ).fetchall()
+    return [{
+        "id": row["id"], "name": row["name"], "version": 2,
+        "has_self": bool(row["has_self"]),
+        "others_count": row["others_count"] or 0,
+        "updated_at": row["updated_at"],
+    } for row in rows]
+
+
+def save_response_v2(conn, payload, owner_hash):
+    mode = payload.get("mode")
+    if mode not in ("self", "other"):
+        raise ApiError(400, "Поле «mode» должно быть 'self' или 'other'")
+    subject_name = validate_name(payload.get("subject"), "псевдоним")
+    answers = validate_answers(payload.get("answers"))
+    overwrite = bool(payload.get("overwrite"))
+    rater = (
+        validate_name(payload.get("rater"), "ваш псевдоним")
+        if mode == "other" else subject_name
+    )
+    scores, ya, my, quadrant = compute_scores_v2(answers)
+    with conn:
+        subject = ensure_subject(conn, subject_name)
+        author = subject if mode == "self" else ensure_subject(conn, rater)
+        if mode == "self":
+            if not owner_hash:
+                raise ApiError(400, "В браузере отключены cookie — самооценку сохранить нельзя")
+            existing = conn.execute(
+                "SELECT id FROM responses_v2 WHERE subject_id = ? AND mode = 'self'",
+                (subject["id"],),
+            ).fetchone()
+            if subject["owner_hash"] and not is_owner(subject, owner_hash):
+                raise ApiError(
+                    403,
+                    "Псевдоним «%s» уже занят: самооценка под ним заполнена из другого "
+                    "браузера. Выберите другой псевдоним." % subject["name"],
+                )
+            if existing and not overwrite:
+                raise ApiError(409, "У этого профиля v2 уже есть самооценка")
+            if existing:
+                conn.execute("DELETE FROM responses_v2 WHERE id = ?", (existing["id"],))
+            conn.execute(
+                "UPDATE subjects SET owner_hash = ? WHERE id = ?",
+                (owner_hash, subject["id"]),
+            )
+        cur = conn.execute(
+            """
+            INSERT INTO responses_v2(
+                subject_id, author_id, mode, rater, answers,
+                s_mysh, s_kozh, s_or, s_zr, s_an, s_ur, s_zv, s_ob,
+                ya, my, quadrant, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                subject["id"], author["id"], mode, author["name"], json.dumps(answers),
+                scores["mysh"], scores["kozh"], scores["or"], scores["zr"],
+                scores["an"], scores["ur"], scores["zv"], scores["ob"],
+                ya, my, quadrant, now_ms(),
+            ),
+        )
+        response_id = cur.lastrowid
+    summary = subject_summary_v2(conn, subject)
+    if mode == "self":
+        summary.update(build_profile_v2(conn, subject))
+    return {
+        "ok": True, "version": 2, "id": response_id,
+        "author_id": author["id"], "subject_id": subject["id"], "subject": summary,
     }
 
 
@@ -715,6 +947,160 @@ def links_to_csv(rows):
             item[f"q{n + 1:02d}"] = answers[n] if n < len(answers) else ""
         writer.writerow(item)
     return ("\ufeff" + buf.getvalue()).encode("utf-8")
+
+
+# ----------------------------------------------------------------------------
+# Связи v2: подписанный сдвиг + задержка
+# ----------------------------------------------------------------------------
+
+def _link_cell_v2(answer_index, delay_index):
+    signed = V2_SCORE_MAP[answer_index]
+    if abs(signed) < 1e-12:
+        return 0j
+    angle = math.radians(V2_DELAY_DEG[delay_index])
+    return complex(signed * math.cos(angle), signed * math.sin(angle))
+
+
+def _matrix_from_half_v2(answers, direction):
+    base = direction * 18
+    matrix = []
+    for row in range(3):
+        line = []
+        for col in range(3):
+            i = base + (row * 3 + col) * 2
+            line.append(_link_cell_v2(answers[i], answers[i + 1]))
+        matrix.append(line)
+    return matrix
+
+
+def matrices_from_answers_v2(answers):
+    matrix_out = _matrix_from_half_v2(answers, 0)
+    matrix_in = _matrix_from_half_v2(answers, 1)
+    # Умеренный сдвиг |A|=4/3 принят за единицу 2-цикла.
+    product = _matmul(
+        _scale(matrix_out, 1 / V2_CYCLE_UNIT),
+        _scale(matrix_in, 1 / V2_CYCLE_UNIT),
+    )
+    radius = round(spectral_radius(product), 4)
+    return matrix_out, matrix_in, radius
+
+
+def link_v2_to_dict(row, with_answers=True):
+    item = {
+        "id": row["id"], "version": 2, "context": row["context"],
+        "self_name": row["self_name"], "partner_name": row["partner_name"],
+        "radius": row["radius"], "created_at": row["created_at"],
+        "matrix_out": json.loads(row["matrix_out"]),
+        "matrix_in": json.loads(row["matrix_in"]),
+    }
+    if with_answers:
+        item["answers"] = json.loads(row["answers"])
+    return item
+
+
+def list_links_v2(conn, owner_hash):
+    if not owner_hash:
+        return []
+    rows = conn.execute(
+        """
+        SELECT * FROM link_responses_v2
+         WHERE owner_hash = ?
+         ORDER BY created_at DESC, id DESC
+        """,
+        (owner_hash,),
+    ).fetchall()
+    return [link_v2_to_dict(row, with_answers=False) for row in rows]
+
+
+def find_link_v2(conn, link_id):
+    return conn.execute(
+        "SELECT * FROM link_responses_v2 WHERE id = ?", (link_id,)
+    ).fetchone()
+
+
+def save_link_v2(conn, payload, owner_hash):
+    if not owner_hash:
+        raise ApiError(400, "В браузере отключены cookie — связь сохранить нельзя")
+    context = payload.get("context")
+    if context not in ("family", "work"):
+        raise ApiError(400, "Поле «context» должно быть 'family' или 'work'")
+    self_name = validate_name(payload.get("self"), "ваш псевдоним")
+    partner_name = validate_name(payload.get("partner"), "псевдоним другого человека")
+    if normalize_name(self_name) == normalize_name(partner_name):
+        raise ApiError(400, "Псевдонимы должны различаться: связь с самим собой не оценивается")
+    answers = validate_link_answers(payload.get("answers"))
+    overwrite = bool(payload.get("overwrite"))
+    matrix_out, matrix_in, radius = matrices_from_answers_v2(answers)
+    self_norm = normalize_name(self_name)
+    partner_norm = normalize_name(partner_name)
+    with conn:
+        existing = conn.execute(
+            """
+            SELECT id FROM link_responses_v2
+             WHERE owner_hash = ? AND context = ? AND self_norm = ? AND partner_norm = ?
+            """,
+            (owner_hash, context, self_norm, partner_norm),
+        ).fetchone()
+        if existing and not overwrite:
+            raise ApiError(409, "Эта связь v2 уже сохранена из этого браузера")
+        if existing:
+            conn.execute("DELETE FROM link_responses_v2 WHERE id = ?", (existing["id"],))
+        cur = conn.execute(
+            """
+            INSERT INTO link_responses_v2(
+                owner_hash, context, self_name, self_norm, partner_name, partner_norm,
+                answers, matrix_out, matrix_in, radius, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                owner_hash, context, self_name, self_norm, partner_name, partner_norm,
+                json.dumps(answers),
+                json.dumps(_matrix_json(matrix_out), ensure_ascii=False),
+                json.dumps(_matrix_json(matrix_in), ensure_ascii=False),
+                radius, now_ms(),
+            ),
+        )
+        link_id = cur.lastrowid
+    return {"ok": True, "version": 2, "id": link_id,
+            "link": link_v2_to_dict(find_link_v2(conn, link_id))}
+
+
+def load_admin_links_v2(conn):
+    rows = conn.execute(
+        "SELECT * FROM link_responses_v2 ORDER BY created_at DESC, id DESC"
+    ).fetchall()
+    return [link_v2_to_dict(row) for row in rows]
+
+
+def load_admin_rows_v2(conn):
+    query = """
+        SELECT s.id AS subject_id, s.name AS subject, s.created_at AS subject_created_at,
+               r.id AS response_id, r.created_at, r.mode,
+               r.author_id, a.name AS author_name, r.rater,
+               r.ya, r.my, r.quadrant,
+               r.s_mysh, r.s_kozh, r.s_or, r.s_zr, r.s_an, r.s_ur, r.s_zv, r.s_ob,
+               r.answers
+          FROM subjects s
+          JOIN responses_v2 r ON r.subject_id = s.id
+          LEFT JOIN subjects a ON a.id = r.author_id
+         ORDER BY s.name COLLATE NOCASE, r.created_at, r.id
+    """
+    rows = []
+    for rec in conn.execute(query):
+        rows.append({
+            "response_id": rec["response_id"],
+            "created_at": iso_utc(rec["created_at"] or rec["subject_created_at"]),
+            "ts": rec["created_at"] or rec["subject_created_at"],
+            "subject_id": rec["subject_id"], "subject": rec["subject"],
+            "author_id": rec["author_id"],
+            "author": rec["author_name"] or rec["rater"] or "",
+            "mode": rec["mode"] or "", "rater": rec["author_name"] or rec["rater"] or "",
+            "ya": rec["ya"], "my": rec["my"], "quadrant": rec["quadrant"] or "",
+            "scores": {vid: rec["s_" + vid] for vid in VECTOR_IDS},
+            "answers": json.loads(rec["answers"]) if rec["answers"] else [],
+            "version": 2,
+        })
+    return rows
 
 
 # ----------------------------------------------------------------------------
@@ -968,6 +1354,17 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "Файл не найден")
         self._send_bytes(200, body, content_type)
 
+    def _send_csv(self, body, filename):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/csv; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Cache-Control", "no-store")
+        self._send_pending_cookies()
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     def _read_json(self):
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -993,6 +1390,15 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, "Некорректный id связи")
         return int(raw)
 
+    def _link_v2_id_from_path(self, path):
+        prefix = "/api/v2/links/"
+        if not path.startswith(prefix):
+            return None
+        raw = path[len(prefix):].strip("/")
+        if not raw.isdigit():
+            raise ApiError(400, "Некорректный id связи v2")
+        return int(raw)
+
     def _subject_name_from_path(self, path):
         prefix = "/api/subjects/"
         if not path.startswith(prefix):
@@ -1000,6 +1406,15 @@ class Handler(BaseHTTPRequestHandler):
         name = unquote(path[len(prefix):]).strip()
         if not name:
             raise ApiError(400, "Имя профиля не указано")
+        return name
+
+    def _subject_v2_name_from_path(self, path):
+        prefix = "/api/v2/subjects/"
+        if not path.startswith(prefix):
+            return None
+        name = unquote(path[len(prefix):]).strip()
+        if not name:
+            raise ApiError(400, "Имя профиля v2 не указано")
         return name
 
     def _dispatch(self, method):
@@ -1028,6 +1443,14 @@ class Handler(BaseHTTPRequestHandler):
             self._visitor_token()
             self._send_file("links.html", "text/html; charset=utf-8")
             return True
+        if path in ("/v2", "/v2/", "/v2/index.html", "/v2/admin", "/v2/admin/"):
+            self._visitor_token()
+            self._send_file("index-v2.html", "text/html; charset=utf-8")
+            return True
+        if path in ("/v2/links", "/v2/links/"):
+            self._visitor_token()
+            self._send_file("links-v2.html", "text/html; charset=utf-8")
+            return True
         if path == "/api/admin/me":
             email = self._require_admin()
             self._send_json({"email": email})
@@ -1038,7 +1461,21 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({
                     "rows": load_admin_rows(conn),
                     "links": load_admin_links(conn),
+                    "rows_v2": load_admin_rows_v2(conn),
+                    "links_v2": load_admin_links_v2(conn),
                 })
+            return True
+        if path == "/api/admin/export-v2.csv":
+            self._require_admin()
+            with connect() as conn:
+                body = rows_to_csv(load_admin_rows_v2(conn))
+            self._send_csv(body, "opros-v2.csv")
+            return True
+        if path == "/api/admin/export-links-v2.csv":
+            self._require_admin()
+            with connect() as conn:
+                body = links_to_csv(load_admin_links_v2(conn))
+            self._send_csv(body, "opros-links-v2.csv")
             return True
         if path == "/api/admin/export-links.csv":
             self._require_admin()
@@ -1060,6 +1497,20 @@ class Handler(BaseHTTPRequestHandler):
             owner_hash = self._owner_hash()
             with connect() as conn:
                 self._send_json({"links": list_links(conn, owner_hash)})
+            return True
+        if path == "/api/v2/links":
+            with connect() as conn:
+                self._send_json({"links": list_links_v2(conn, self._owner_hash()), "version": 2})
+            return True
+        link_v2_id = self._link_v2_id_from_path(path)
+        if link_v2_id is not None and self.command in ("GET", "HEAD"):
+            with connect() as conn:
+                row = find_link_v2(conn, link_v2_id)
+                if not row:
+                    raise ApiError(404, "Связь v2 не найдена")
+                if not can_view_link(row, self._owner_hash(), self._admin_email()):
+                    raise ApiError(403, "Эту связь видит только тот, кто её заполнил")
+                self._send_json(link_v2_to_dict(row))
             return True
         link_id = self._link_id_from_path(path)
         if link_id is not None and self.command in ("GET", "HEAD"):
@@ -1097,6 +1548,24 @@ class Handler(BaseHTTPRequestHandler):
                     "subjects": list_subjects(conn, owner_hash),
                     "names": list_names(conn),
                 })
+            return True
+        if path == "/api/v2/subjects":
+            owner_hash = self._owner_hash()
+            with connect() as conn:
+                self._send_json({
+                    "subjects": list_subjects_v2(conn, owner_hash),
+                    "names": list_names_v2(conn), "version": 2,
+                })
+            return True
+        name_v2 = self._subject_v2_name_from_path(path)
+        if name_v2 is not None:
+            with connect() as conn:
+                subject = find_subject(conn, name_v2)
+                if not subject:
+                    raise ApiError(404, "Профиль v2 не найден")
+                if not self._can_view(subject):
+                    raise ApiError(403, "Профиль v2 виден только его владельцу")
+                self._send_json(build_profile_v2(conn, subject))
             return True
         name = self._subject_name_from_path(path)
         if name is not None:
@@ -1144,11 +1613,23 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_response(conn, payload, owner_hash)
             self._send_json(result, 201)
             return True
+        if path == "/api/v2/responses":
+            payload = self._read_json()
+            with connect() as conn:
+                result = save_response_v2(conn, payload, self._owner_hash())
+            self._send_json(result, 201)
+            return True
         if path == "/api/links":
             payload = self._read_json()
             owner_hash = self._owner_hash()
             with connect() as conn:
                 result = save_link(conn, payload, owner_hash)
+            self._send_json(result, 201)
+            return True
+        if path == "/api/v2/links":
+            payload = self._read_json()
+            with connect() as conn:
+                result = save_link_v2(conn, payload, self._owner_hash())
             self._send_json(result, 201)
             return True
         return False
@@ -1158,6 +1639,7 @@ class Handler(BaseHTTPRequestHandler):
             self._require_admin()
             with connect() as conn, conn:
                 conn.execute("DELETE FROM responses")
+                conn.execute("DELETE FROM responses_v2")
                 conn.execute("DELETE FROM subjects")
             self._send_json({"ok": True})
             return True
@@ -1174,7 +1656,46 @@ class Handler(BaseHTTPRequestHandler):
                     "UPDATE responses SET author_id = NULL WHERE author_id = ? AND subject_id != ?",
                     (subject["id"], subject["id"]),
                 )
-                conn.execute("DELETE FROM subjects WHERE id = ?", (subject["id"],))
+                conn.execute("DELETE FROM responses WHERE subject_id = ?", (subject["id"],))
+                remaining = conn.execute(
+                    "SELECT EXISTS(SELECT 1 FROM responses WHERE subject_id=?) "
+                    "OR EXISTS(SELECT 1 FROM responses_v2 WHERE subject_id=?)",
+                    (subject["id"], subject["id"]),
+                ).fetchone()[0]
+                if not remaining:
+                    conn.execute(
+                        "UPDATE responses_v2 SET author_id = NULL WHERE author_id = ?",
+                        (subject["id"],),
+                    )
+                    conn.execute("DELETE FROM subjects WHERE id = ?", (subject["id"],))
+            self._send_json({"ok": True})
+            return True
+        name_v2 = self._subject_v2_name_from_path(path)
+        if name_v2 is not None:
+            with connect() as conn, conn:
+                subject = find_subject(conn, name_v2)
+                if not subject:
+                    raise ApiError(404, "Профиль v2 не найден")
+                if not self._can_view(subject):
+                    raise ApiError(403, "Удалить профиль v2 может только его владелец")
+                conn.execute(
+                    "UPDATE responses_v2 SET author_id = NULL "
+                    "WHERE author_id = ? AND subject_id != ?",
+                    (subject["id"], subject["id"]),
+                )
+                conn.execute("DELETE FROM responses_v2 WHERE subject_id = ?", (subject["id"],))
+                # Человека удаляем только если на него больше нет ответов ни в одной версии.
+                remaining = conn.execute(
+                    "SELECT EXISTS(SELECT 1 FROM responses WHERE subject_id=?) "
+                    "OR EXISTS(SELECT 1 FROM responses_v2 WHERE subject_id=?)",
+                    (subject["id"], subject["id"]),
+                ).fetchone()[0]
+                if not remaining:
+                    conn.execute(
+                        "UPDATE responses SET author_id = NULL WHERE author_id = ?",
+                        (subject["id"],),
+                    )
+                    conn.execute("DELETE FROM subjects WHERE id = ?", (subject["id"],))
             self._send_json({"ok": True})
             return True
         link_id = self._link_id_from_path(path)
@@ -1186,6 +1707,17 @@ class Handler(BaseHTTPRequestHandler):
                 if not can_view_link(row, self._owner_hash(), self._admin_email()):
                     raise ApiError(403, "Удалить связь может только тот, кто её заполнил")
                 conn.execute("DELETE FROM link_responses WHERE id = ?", (link_id,))
+            self._send_json({"ok": True})
+            return True
+        link_v2_id = self._link_v2_id_from_path(path)
+        if link_v2_id is not None:
+            with connect() as conn, conn:
+                row = find_link_v2(conn, link_v2_id)
+                if not row:
+                    raise ApiError(404, "Связь v2 не найдена")
+                if not can_view_link(row, self._owner_hash(), self._admin_email()):
+                    raise ApiError(403, "Удалить связь v2 может только тот, кто её заполнил")
+                conn.execute("DELETE FROM link_responses_v2 WHERE id = ?", (link_v2_id,))
             self._send_json({"ok": True})
             return True
         return False
