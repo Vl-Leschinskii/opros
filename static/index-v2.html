@@ -834,7 +834,6 @@ const N = QUESTIONS.length;
 const LABELS_SELF  = ['совсем не про меня','скорее не про меня','иногда / отчасти','скорее про меня','очень про меня'];
 const LABELS_OTHER = ['совсем не про него(неё)','скорее не про него(неё)','иногда / отчасти','скорее про него(неё)','очень про него(неё)'];
 const SCORE_MAP = [-2, -4/3, 0, 4/3, 2];
-const SCORE_LABELS = ['−2','−1,33','0','+1,33','+2'];
 
 const DESC = {
   mysh:{hi:'Сила, действие, подчинение. Опора стаи, человек дела.',lo:'Простая физическая реакция и роль исполнителя выражены слабо.'},
@@ -1115,7 +1114,7 @@ function renderQuestion(){
   for(let i=0;i<5;i++){
     const b = document.createElement('button');
     b.className = 'opt' + (answers[current]===i ? ' selected' : '');
-    b.innerHTML = '<span class="num">'+SCORE_LABELS[i]+'</span><span>'+labels[i]+'</span>';
+    b.innerHTML = '<span>'+labels[i]+'</span>';
     b.onclick = ()=> selectOption(i);
     qOptions.appendChild(b);
   }
