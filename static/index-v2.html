@@ -753,16 +753,22 @@
       <div class="profiles-head">
         <h2>База опросов</h2>
         <div class="admin-actions">
-          <a class="btn small" id="adminExport" href="#">Скачать CSV</a>
-          <a class="btn ghost small" id="adminExportLinks" href="#">Скачать связи CSV</a>
+          <a class="btn small" id="adminExport" href="#">CSV личности v1</a>
+          <a class="btn ghost small" id="adminExportLinks" href="#">CSV связей v1</a>
+          <a class="btn small" id="adminExportV2" href="#">CSV личности v2</a>
+          <a class="btn ghost small" id="adminExportLinksV2" href="#">CSV связей v2</a>
           <button class="btn ghost small" onclick="adminLogout()">Выйти</button>
         </div>
       </div>
       <p class="profiles-desc" id="adminMeta"></p>
-      <h3 class="admin-block-title">Личность</h3>
+      <h3 class="admin-block-title">Личность, версия 1</h3>
       <div class="admin-scroll" id="adminTable"></div>
-      <h3 class="admin-block-title">Связи</h3>
+      <h3 class="admin-block-title">Личность, версия 2</h3>
+      <div class="admin-scroll" id="adminTableV2"></div>
+      <h3 class="admin-block-title">Связи, версия 1</h3>
       <div class="admin-scroll" id="adminLinks"></div>
+      <h3 class="admin-block-title">Связи, версия 2</h3>
+      <div class="admin-scroll" id="adminLinksV2"></div>
     </div>
   </section>
 
@@ -2062,8 +2068,10 @@ function showAdminLogin(){
 function showAdminPanel(email){
   document.getElementById('adminLogin').style.display = 'none';
   document.getElementById('adminPanel').style.display = '';
-  document.getElementById('adminExport').href = BASE + '/api/admin/export-v2.csv';
-  document.getElementById('adminExportLinks').href = BASE + '/api/admin/export-links-v2.csv';
+  document.getElementById('adminExport').href = BASE + '/api/admin/export.csv';
+  document.getElementById('adminExportLinks').href = BASE + '/api/admin/export-links.csv';
+  document.getElementById('adminExportV2').href = BASE + '/api/admin/export-v2.csv';
+  document.getElementById('adminExportLinksV2').href = BASE + '/api/admin/export-links-v2.csv';
   document.getElementById('adminMeta').textContent = 'Сессия: ' + email;
 }
 async function refreshAdmin(){
@@ -2072,12 +2080,21 @@ async function refreshAdmin(){
     const me = await api('GET', BASE + '/api/admin/me');
     showAdminPanel(me.email);
     const data = await api('GET', BASE + '/api/admin/data');
-    const rows = data.rows_v2 || [];
-    const links = data.links_v2 || [];
+    const rows = data.rows || [];
+    const links = data.links || [];
+    const rowsV2 = data.rows_v2 || [];
+    const linksV2 = data.links_v2 || [];
+    const count = list => list.filter(r => r.response_id != null).length;
     const meta = document.getElementById('adminMeta');
-    meta.textContent = meta.textContent + ' · личностей: ' + rows.filter(r => r.response_id != null).length + ' · связей: ' + links.length;
-    renderAdminTable(rows);
-    renderAdminLinks(links);
+    meta.textContent = meta.textContent
+      + ' · личности v1: ' + count(rows)
+      + ' · связи v1: ' + links.length
+      + ' · личности v2: ' + count(rowsV2)
+      + ' · связи v2: ' + linksV2.length;
+    renderAdminTable(rows, 'adminTable');
+    renderAdminTable(rowsV2, 'adminTableV2');
+    renderAdminLinks(links, 'adminLinks');
+    renderAdminLinks(linksV2, 'adminLinksV2');
   } catch(e){
     showAdminLogin();
     if(e.status !== 401) document.getElementById('adminLoginError').textContent = e.message;
@@ -2107,11 +2124,11 @@ async function adminLogout(){
   showAdminLogin();
 }
 const LINK_CHANNEL_NAMES = {emotion:'эмоция', resource:'ресурс', goal:'цель'};
-function renderAdminLinks(links){
-  const wrap = document.getElementById('adminLinks');
+function renderAdminLinks(links, targetId){
+  const wrap = document.getElementById(targetId);
   if(!wrap) return;
   if(!links.length){
-    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>Связей пока нет.</div>';
+    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>Записей нет.</div>';
     return;
   }
   const channels = ['emotion','resource','goal'];
@@ -2131,10 +2148,10 @@ function renderAdminLinks(links){
   }).join('');
   wrap.innerHTML = '<table class="admin-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>';
 }
-function renderAdminTable(rows){
-  const wrap = document.getElementById('adminTable');
+function renderAdminTable(rows, targetId){
+  const wrap = document.getElementById(targetId);
   if(!rows.length){
-    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>База пока пуста.</div>';
+    wrap.innerHTML = '<div class="empty-state"><span class="es-icon">◌</span>Записей нет.</div>';
     return;
   }
   const head = '<tr><th>Дата</th><th>id про кого</th><th>Псевдоним</th><th>Режим</th><th>id кто заполнил</th><th>Кто заполнил</th><th>Я</th><th>Мы</th><th>Квадрант</th>'
